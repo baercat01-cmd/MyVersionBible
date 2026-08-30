@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/main.tsx","./src/components/NoteEditor.tsx","./src/lib/bolls.ts","./src/lib/books.ts","./src/lib/db.ts","./src/lib/refs.ts","./src/lib/supabase.ts","./src/lib/templates.ts","./src/views/AccountView.tsx","./src/views/PrintView.tsx","./src/views/ReaderView.tsx","./src/views/StudyView.tsx","./src/views/VersionsView.tsx"],"version":"5.9.3"}
