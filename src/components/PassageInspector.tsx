@@ -71,10 +71,7 @@ export default function PassageInspector({ refs, translation, onTranslation, onC
   if (!refs.length) {
     return (
       <div className="card sermon-passage">
-        <p className="muted small">
-          Put in the reference being preached on and the passage opens here — with its
-          background, cross references and original words, ready to check as you listen.
-        </p>
+        <p className="muted small">Add a passage to read it here.</p>
       </div>
     )
   }
@@ -173,9 +170,6 @@ export default function PassageInspector({ refs, translation, onTranslation, onC
         </div>
       )}
 
-      <p className="muted small sermon-hint">
-        Tap a word for the original behind it; tap a verse number for its cross references.
-      </p>
 
       <ContextPanel book={refs[0].book} />
       {selectedCodes.length > 0 && <StrongsInfo codes={selectedCodes} translation={translation} />}

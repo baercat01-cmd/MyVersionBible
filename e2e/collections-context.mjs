@@ -1,5 +1,6 @@
 // Verse collections, memorisation review, and the historical context panel.
 import { chromium } from 'playwright'
+import { navTo } from './nav.mjs'
 const BASE = process.env.BASE_URL || 'http://localhost:4173/'
 const fail = m => { console.error('FAIL: ' + m); process.exitCode = 1 }
 const ok = m => console.log('  ok - ' + m)
@@ -9,15 +10,15 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 950 } })
 const cardFile = t => page.locator('.card').filter({ hasText: t }).locator('input[type=file]').first()
 page.on('pageerror', e => fail('page error: ' + e.message))
 await page.goto(BASE, { waitUntil: 'networkidle' })
-const tab = name => page.locator('.tabbar button').filter({ hasText: name }).first()
+const tab = navTo(page)
 
-await tab('Versions').click()
+await tab('Versions')
 await cardFile('Import a translation from a file').setInputFiles(
   new URL('./fixture-TESTV.json', import.meta.url).pathname)
 await page.waitForSelector('text=/TESTV/', { timeout: 15000 })
 
 // ---------- Historical context ----------
-await tab('Read').click()
+await tab('Read')
 await page.waitForSelector('.verse .word')
 await page.selectOption('select >> nth=1', '1')       // Genesis
 await page.waitForTimeout(400)
@@ -53,7 +54,7 @@ await page.locator('.collect-pop button[type=submit]').click()
 await page.waitForSelector('.collect-pop', { state: 'detached' })
 ok('a verse can be added to a new list from the reader')
 
-await tab('Lists').click()
+await tab('Lists')
 // The header card renders before the live query resolves, so wait for the
 // collection itself rather than for any card.
 await page.waitForSelector('text=/The Word/', { timeout: 10000 })

@@ -6,7 +6,9 @@ import {
   SERMON_TEMPLATE, parsePoints, serialisePoints, resolveReference,
   sermonMeta, studyFromSermon, type SermonPoint
 } from '../lib/sermons'
+import { useNarrow } from '../lib/useNarrow'
 import PassageInspector from './PassageInspector'
+import Section from './Section'
 
 interface Props {
   note?: NoteRec
@@ -16,24 +18,41 @@ interface Props {
 
 const today = () => new Date().toISOString().slice(0, 10)
 
+/** One line of the "preaching from" list: what was typed, and what it resolved to. */
+interface RefLine { input: string; refs: VerseRef[]; label: string; error: boolean }
+
+const emptyLine = (): RefLine => ({ input: '', refs: [], label: '', error: false })
+
 /**
  * Taking notes while a sermon is being preached.
  *
- * The reference goes in first, which opens the passage beside the notes; from
- * there a point can be captured straight off the text and an original word
- * dropped into the notes without breaking the flow of listening. Everything is
- * saved as it is typed, because a sermon does not wait for you to press Save.
+ * On a phone the notes and the passage take turns rather than sitting side by
+ * side, so neither is a scroll away from the other: one tap switches, and a
+ * point captured from the passage lands in the outline without leaving the
+ * text. Everything is saved as it is typed, because a sermon does not wait.
  */
 export default function SermonEditor({ note, onDone, onOpenStudy }: Props) {
+  const narrow = useNarrow()
+  const [pane, setPane] = useState<'notes' | 'passage'>('notes')
+
   const [title, setTitle] = useState(note?.title || '')
   const [speaker, setSpeaker] = useState(sermonMeta(note, 'speaker'))
   const [series, setSeries] = useState(sermonMeta(note, 'series'))
   const [place, setPlace] = useState(sermonMeta(note, 'place'))
   const [preached, setPreached] = useState(sermonMeta(note, 'preached') || today())
-  const [refs, setRefs] = useState<VerseRef[]>(note?.refs || [])
-  const [refInput, setRefInput] = useState(note?.refs?.length ? formatRef(note.refs[0]) : '')
-  const [refError, setRefError] = useState('')
-  const [refLabel, setRefLabel] = useState(note?.refs?.length ? formatRef(note.refs[0]) : '')
+
+  // The passages preached from, as line items - a sermon rarely stays in one.
+  const [lines, setLines] = useState<RefLine[]>(() => {
+    const saved = note?.sections?.passages
+    if (saved) {
+      return saved.split('\n').filter(Boolean).map(input => ({ input, refs: [], label: input, error: false }))
+    }
+    if (note?.refs?.length) {
+      return note.refs.map(r => ({ input: formatRef(r), refs: [r], label: formatRef(r), error: false }))
+    }
+    return [emptyLine()]
+  })
+
   const [points, setPoints] = useState<SermonPoint[]>(() => {
     const existing = parsePoints(note?.sections?.points)
     return existing.length ? existing : [{ text: '', ref: null }]
@@ -47,7 +66,7 @@ export default function SermonEditor({ note, onDone, onOpenStudy }: Props) {
   })
   const [tags, setTags] = useState((note?.tags || []).join(', '))
   const [saved, setSaved] = useState<string | null>(null)
-  const [madeStudy, setMadeStudy] = useState(false)
+  const [flash, setFlash] = useState('')
 
   const translations = useLiveQuery(() => db.translations.toArray(), []) || []
   const [translation, setTranslation] = useState(note?.refs?.[0]?.translation || '')
@@ -58,6 +77,25 @@ export default function SermonEditor({ note, onDone, onOpenStudy }: Props) {
   const idRef = useRef(note?.id)
   const dirtyRef = useRef(false)
   const pointRefs = useRef<(HTMLInputElement | null)[]>([])
+  const allRefs = lines.flatMap(l => l.refs)
+
+  // Resolve every typed line against the chosen version.
+  useEffect(() => {
+    let live = true
+    ;(async () => {
+      const resolved = await Promise.all(lines.map(async l => {
+        if (!l.input.trim()) return { ...l, refs: [], label: '', error: false }
+        const found = await resolveReference(l.input, translation)
+        return found
+          ? { ...l, refs: found.refs, label: found.label, error: false }
+          : { ...l, refs: [], label: '', error: true }
+      }))
+      const changed = resolved.some((r, i) =>
+        r.label !== lines[i].label || r.error !== lines[i].error || r.refs.length !== lines[i].refs.length)
+      if (live && changed) setLines(resolved)
+    })()
+    return () => { live = false }
+  }, [lines.map(l => l.input).join(' '), translation])
 
   function collect() {
     return {
@@ -66,9 +104,12 @@ export default function SermonEditor({ note, onDone, onOpenStudy }: Props) {
       title,
       content: '',
       template: SERMON_TEMPLATE.id,
-      refs,
+      refs: allRefs,
       sections: {
         speaker, series, place, preached,
+        // The references as they were given, one per line, so a whole chapter
+        // stays a whole chapter and the list comes back as it was typed.
+        passages: lines.map(l => l.input.trim()).filter(Boolean).join('\n'),
         bigidea: fields.bigidea,
         points: serialisePoints(points),
         words: fields.words,
@@ -88,32 +129,25 @@ export default function SermonEditor({ note, onDone, onOpenStudy }: Props) {
     return rec
   }
 
-  // Save shortly after typing stops, so nothing is lost mid-sermon.
   useEffect(() => {
     dirtyRef.current = true
     const timer = setTimeout(() => { if (dirtyRef.current) persist() }, 1500)
     return () => clearTimeout(timer)
-  }, [title, speaker, series, place, preached, refs, points, fields, tags])
+  }, [title, speaker, series, place, preached, lines, points, fields, tags])
 
-  // And once more on the way out, in case the app is closed straight after.
   useEffect(() => () => { if (dirtyRef.current) persist() }, [])
 
-  async function lookupRef(text: string) {
-    setRefInput(text)
-    if (!text.trim()) { setRefs([]); setRefLabel(''); setRefError(''); return }
-    const found = await resolveReference(text, translation)
-    if (!found) { setRefError('Not a reference I can read — try "John 3:16-18".'); return }
-    setRefError('')
-    setRefs(found.refs)
-    // The reference as it was given — a whole chapter stays a whole chapter,
-    // even on a device that has not downloaded that version to clamp it.
-    setRefLabel(found.label)
+  function setLine(i: number, input: string) {
+    setLines(ls => ls.map((l, j) => (j === i ? { ...l, input } : l)))
   }
 
-  // Re-resolve against a different version, so verse ranges match its text.
-  useEffect(() => {
-    if (refInput.trim()) lookupRef(refInput)
-  }, [translation])
+  function addLine() {
+    setLines(ls => [...ls, emptyLine()])
+  }
+
+  function removeLine(i: number) {
+    setLines(ls => (ls.length === 1 ? [emptyLine()] : ls.filter((_, j) => j !== i)))
+  }
 
   function setPoint(i: number, patch: Partial<SermonPoint>) {
     setPoints(ps => ps.map((p, j) => (j === i ? { ...p, ...patch } : p)))
@@ -138,158 +172,157 @@ export default function SermonEditor({ note, onDone, onOpenStudy }: Props) {
     })
   }
 
-  /** A verse captured from the passage panel becomes the next point. */
+  function say(message: string) {
+    setFlash(message)
+    setTimeout(() => setFlash(''), 1800)
+  }
+
+  /** A verse captured from the passage becomes the next point, without leaving it. */
   function capturePoint(ref: VerseRef, text: string) {
     setPoints(ps => {
       const last = ps[ps.length - 1]
-      const quoted = `“${text}”`
-      if (last && !last.text.trim() && !last.ref) {
-        return [...ps.slice(0, -1), { ref, text: quoted }]
-      }
+      const quoted = `"${text}"`
+      if (last && !last.text.trim() && !last.ref) return [...ps.slice(0, -1), { ref, text: quoted }]
       return [...ps, { ref, text: quoted }]
     })
+    say('Added to the outline')
   }
 
   function captureWord(line: string) {
     setFields(f => ({ ...f, words: f.words ? `${f.words}\n${line}` : line }))
+    say('Added to the words')
   }
 
   async function makeStudy() {
     const rec = await persist()
     const study = await studyFromSermon(rec)
-    setMadeStudy(true)
+    say('Study started - find it under Study')
     onOpenStudy?.(study)
   }
 
+  const questionCount = fields.questions.split('\n').filter(l => l.trim()).length
+  const wordCount = fields.words.split('\n').filter(l => l.trim()).length
+  const showNotes = !narrow || pane === 'notes'
+  const showPassage = !narrow || pane === 'passage'
+  const resolvedLines = lines.filter(l => l.refs.length).length
+
   return (
-    <div className="sermon-grid">
-      <div className="sermon-notes">
-        <div className="card editor-section">
-          <input
-            type="text" placeholder="Sermon title" value={title}
-            onChange={e => setTitle(e.target.value)}
-            style={{ width: '100%', fontWeight: 600, marginBottom: 8 }}
-          />
-          <div className="row sermon-meta">
-            <input type="text" placeholder="Preacher" value={speaker} onChange={e => setSpeaker(e.target.value)} />
-            <input type="text" placeholder="Series" value={series} onChange={e => setSeries(e.target.value)} />
-            <input type="text" placeholder="Where" value={place} onChange={e => setPlace(e.target.value)} />
-            <input type="date" value={preached} onChange={e => setPreached(e.target.value)} />
-          </div>
-
-          <label htmlFor="sermon-ref">Preaching from</label>
-          <div className="hint">The reference given — "John 3:16-18", "1 Cor 13", "Rom 8:28-39".</div>
-          <input
-            id="sermon-ref" type="text" placeholder="John 3:16-18"
-            value={refInput} onChange={e => lookupRef(e.target.value)}
-            style={{ width: '100%' }}
-          />
-          {refError && <div className="hint sermon-referror">{refError}</div>}
-          {refs.length > 0 && (
-            <div style={{ marginTop: 6 }}>
-              <span className="tag">📖 {refLabel || formatRef(refs[0])}</span>
-            </div>
-          )}
+    <div className="sermon-wrap">
+      {narrow && (
+        <div className="segmented no-print">
+          <button className={pane === 'notes' ? 'on' : ''} onClick={() => setPane('notes')}>Notes</button>
+          <button className={pane === 'passage' ? 'on' : ''} onClick={() => setPane('passage')}>
+            Passage{resolvedLines ? ` (${resolvedLines})` : ''}
+          </button>
         </div>
+      )}
 
-        <div className="card editor-section">
-          <label>Big idea</label>
-          <div className="hint">{SERMON_TEMPLATE.sections[0].hint}</div>
-          <textarea
-            value={fields.bigidea} onChange={e => setFields({ ...fields, bigidea: e.target.value })}
-            style={{ minHeight: 60 }}
-          />
+      {flash && <div className="sermon-flash">{flash}</div>}
 
-          <label>Outline</label>
-          <div className="hint">
-            One line per point. Capture a verse from the passage beside you with <strong>+ Point</strong>,
-            or type a reference of your own beside the line.
-          </div>
-          {points.map((p, i) => (
-            <div className="sermon-point" key={i}>
+      <div className="sermon-grid">
+        {showNotes && (
+          <div className="sermon-notes">
+            <div className="card editor-section">
               <input
-                className="sermon-point-ref" type="text" placeholder="ref"
-                value={p.ref ? formatRef(p.ref) : ''}
-                onChange={async e => {
-                  const found = e.target.value.trim() ? await resolveReference(e.target.value, translation) : null
-                  setPoint(i, { ref: found ? found.refs[0] : null })
-                }}
-                title="The verse this point came from"
+                type="text" placeholder="Sermon title" value={title}
+                onChange={e => setTitle(e.target.value)} className="sermon-title"
               />
-              <input
-                className="sermon-point-text" type="text" placeholder={`Point ${i + 1}`}
-                ref={el => { pointRefs.current[i] = el }}
-                value={p.text} onChange={e => setPoint(i, { text: e.target.value })}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addPoint(i) } }}
-              />
-              <button className="linklike small" onClick={() => movePoint(i, -1)} title="Move up" aria-label="Move up">↑</button>
-              <button className="linklike small" onClick={() => movePoint(i, 1)} title="Move down" aria-label="Move down">↓</button>
-              <button className="linklike small" onClick={() => removePoint(i)} title="Remove" aria-label="Remove point">✕</button>
+              <div className="row sermon-meta">
+                <input type="text" placeholder="Preacher" value={speaker} onChange={e => setSpeaker(e.target.value)} />
+                <input type="text" placeholder="Series" value={series} onChange={e => setSeries(e.target.value)} />
+                <input type="text" placeholder="Where" value={place} onChange={e => setPlace(e.target.value)} />
+                <input type="date" value={preached} onChange={e => setPreached(e.target.value)} />
+              </div>
+
+              <label>Preaching from</label>
+              {lines.map((l, i) => (
+                <div className="sermon-refline" key={i}>
+                  <input
+                    id={i === 0 ? 'sermon-ref' : undefined}
+                    type="text" placeholder="John 3:16-18"
+                    value={l.input} onChange={e => setLine(i, e.target.value)}
+                    className={l.error ? 'bad' : ''}
+                  />
+                  {l.label && <span className="tag">{l.label}</span>}
+                  <button className="linklike" onClick={() => removeLine(i)} aria-label="Remove passage">x</button>
+                </div>
+              ))}
+              <button className="btn secondary small" onClick={addLine}>+ Passage</button>
             </div>
-          ))}
-          <button className="btn secondary small" onClick={() => addPoint(points.length - 1)}>+ Point</button>
 
-          <label>Words to look at</label>
-          <div className="hint">
-            Tap a word in the passage and add it here with its Strong's entry — the meaning
-            comes with it, so it is still there when you study later.
+            <div className="card editor-section">
+              <label>Big idea</label>
+              <textarea
+                value={fields.bigidea} onChange={e => setFields({ ...fields, bigidea: e.target.value })}
+                className="sermon-idea"
+              />
+
+              <label>Outline</label>
+              {points.map((p, i) => (
+                <div className="sermon-point" key={i}>
+                  <input
+                    className="sermon-point-ref" type="text" placeholder="ref"
+                    value={p.ref ? formatRef(p.ref) : ''}
+                    onChange={async e => {
+                      const found = e.target.value.trim() ? await resolveReference(e.target.value, translation) : null
+                      setPoint(i, { ref: found ? found.refs[0] : null })
+                    }}
+                  />
+                  <input
+                    className="sermon-point-text" type="text" placeholder={`Point ${i + 1}`}
+                    ref={el => { pointRefs.current[i] = el }}
+                    value={p.text} onChange={e => setPoint(i, { text: e.target.value })}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addPoint(i) } }}
+                  />
+                  <button className="linklike" onClick={() => movePoint(i, -1)} aria-label="Move up">^</button>
+                  <button className="linklike" onClick={() => movePoint(i, 1)} aria-label="Move down">v</button>
+                  <button className="linklike" onClick={() => removePoint(i)} aria-label="Remove point">x</button>
+                </div>
+              ))}
+              <button className="btn secondary small" onClick={() => addPoint(points.length - 1)}>+ Point</button>
+            </div>
+
+            <div className="card sermon-folds">
+              <Section label="Words to look at" badge={wordCount ? String(wordCount) : undefined}>
+                <textarea value={fields.words} onChange={e => setFields({ ...fields, words: e.target.value })} />
+              </Section>
+              <Section label="Quotes and illustrations">
+                <textarea value={fields.quotes} onChange={e => setFields({ ...fields, quotes: e.target.value })} />
+              </Section>
+              <Section label="Application">
+                <textarea value={fields.application} onChange={e => setFields({ ...fields, application: e.target.value })} />
+              </Section>
+              <Section label="Questions to study later" badge={questionCount ? String(questionCount) : undefined}>
+                <textarea value={fields.questions} onChange={e => setFields({ ...fields, questions: e.target.value })} />
+              </Section>
+              <Section label="Tags">
+                <input
+                  type="text" placeholder="prayer, grace, romans" value={tags}
+                  onChange={e => setTags(e.target.value)} style={{ width: '100%' }}
+                />
+              </Section>
+            </div>
+
+            <div className="card row sermon-actions">
+              <button className="btn" onClick={async () => { await persist(); onDone() }}>Done</button>
+              <button className="btn secondary" onClick={makeStudy}>Study deeper</button>
+              <div style={{ flex: 1 }} />
+              {saved && <span className="muted small">Saved {saved}</span>}
+            </div>
           </div>
-          <textarea
-            value={fields.words} onChange={e => setFields({ ...fields, words: e.target.value })}
-            style={{ minHeight: 70 }}
-          />
+        )}
 
-          <label>Quotes & illustrations</label>
-          <textarea
-            value={fields.quotes} onChange={e => setFields({ ...fields, quotes: e.target.value })}
-            style={{ minHeight: 70 }}
-          />
-
-          <label>Application</label>
-          <div className="hint">What this asks of you this week.</div>
-          <textarea
-            value={fields.application} onChange={e => setFields({ ...fields, application: e.target.value })}
-            style={{ minHeight: 70 }}
-          />
-
-          <label>Questions to study later</label>
-          <div className="hint">One per line. These carry into the study made from this sermon.</div>
-          <textarea
-            value={fields.questions} onChange={e => setFields({ ...fields, questions: e.target.value })}
-            style={{ minHeight: 70 }}
-          />
-
-          <input
-            type="text" placeholder="Tags (comma-separated)" value={tags}
-            onChange={e => setTags(e.target.value)}
-            style={{ width: '100%', marginTop: 10 }}
-          />
-
-          <div className="row" style={{ marginTop: 12 }}>
-            <button className="btn" onClick={async () => { await persist(); onDone() }}>Done</button>
-            <button className="btn secondary" onClick={makeStudy} title="Start a study from this sermon">
-              📚 Study this deeper
-            </button>
-            <div style={{ flex: 1 }} />
-            {saved && <span className="muted small">Saved {saved}</span>}
+        {showPassage && (
+          <div className="sermon-side">
+            <PassageInspector
+              refs={allRefs}
+              translation={translation}
+              onTranslation={setTranslation}
+              onCapture={capturePoint}
+              onCaptureWord={captureWord}
+            />
           </div>
-          {madeStudy && (
-            <p className="muted small" style={{ marginTop: 6 }}>
-              A study has been started from this sermon — find it under Study, tagged
-              <span className="tag">from-sermon</span>
-            </p>
-          )}
-        </div>
-      </div>
-
-      <div className="sermon-side">
-        <PassageInspector
-          refs={refs}
-          translation={translation}
-          onTranslation={setTranslation}
-          onCapture={capturePoint}
-          onCaptureWord={captureWord}
-        />
+        )}
       </div>
     </div>
   )

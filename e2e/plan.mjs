@@ -1,5 +1,6 @@
 // Reading plan: opening a day, auto check-off, and the streak counter.
 import { chromium } from 'playwright'
+import { navTo } from './nav.mjs'
 const BASE = process.env.BASE_URL || 'http://localhost:4173/'
 const fail = m => { console.error('FAIL: ' + m); process.exitCode = 1 }
 const ok = m => console.log('  ok - ' + m)
@@ -9,13 +10,13 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 950 } })
 const cardFile = t => page.locator('.card').filter({ hasText: t }).locator('input[type=file]').first()
 page.on('pageerror', e => fail('page error: ' + e.message))
 await page.goto(BASE, { waitUntil: 'networkidle' })
-const tab = n => page.locator('.tabbar button').filter({ hasText: n }).first()
+const tab = navTo(page)
 
-await tab('Versions').click()
+await tab('Versions')
 await cardFile('Import a translation from a file').setInputFiles(
   new URL('./fixture-TESTV.json', import.meta.url).pathname)
 await page.waitForSelector('text=/TESTV/', { timeout: 15000 })
-await tab('Story').click()
+await tab('Story')
 await page.waitForSelector('.segment-head h2')
 await page.getByRole('button', { name: /Plan/ }).click()
 await page.waitForSelector('.planday')

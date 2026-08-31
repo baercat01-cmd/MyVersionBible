@@ -2,6 +2,7 @@
 // stands in — which lets the queueing, verse tracking and controls be tested
 // properly rather than just checking a button exists.
 import { chromium } from 'playwright'
+import { navTo } from './nav.mjs'
 const BASE = process.env.BASE_URL || 'http://localhost:4173/'
 const fail = m => { console.error('FAIL: ' + m); process.exitCode = 1 }
 const ok = m => console.log('  ok - ' + m)
@@ -43,12 +44,12 @@ await page.addInitScript(() => {
 })
 
 await page.goto(BASE, { waitUntil: 'networkidle' })
-const tab = n => page.locator('.tabbar button').filter({ hasText: n }).first()
-await tab('Versions').click()
+const tab = navTo(page)
+await tab('Versions')
 await cardFile('Import a translation from a file').setInputFiles(
   new URL('./fixture-AUDIO.json', import.meta.url).pathname)
 await page.waitForSelector('text=/FIXTURE-AUDIO/', { timeout: 15000 })
-await tab('Read').click()
+await tab('Read')
 await page.waitForSelector('.verse .word')
 await page.selectOption('select >> nth=1', '43')
 await page.selectOption('select >> nth=2', '1')

@@ -85,7 +85,8 @@ button.btn.secondary {
   background: transparent; color: var(--accent);
   border: 1px solid var(--accent);
 }
-button.btn.small { padding: 5px 10px; font-size: 0.85rem; }
+/* Big enough to hit with a thumb, on a phone or an e-reader. */
+button.btn.small { padding: 7px 12px; font-size: 0.85rem; min-height: 34px; }
 button.btn:disabled { opacity: 0.5; cursor: default; }
 
 select, input[type='text'], input[type='email'], textarea {
@@ -329,35 +330,101 @@ textarea { width: 100%; min-height: 90px; resize: vertical; line-height: 1.5; }
 /* Isolate the ink canvas so a stroke never repaints the text beneath it. */
 .dl-canvas { contain: strict; will-change: contents; }
 
-/* Sermon notes — the notes on one side, the passage on the other */
+/* Sermon notes - the notes and the passage, side by side or taking turns */
 .sermon-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
-@media (max-width: 900px) {
-  .sermon-grid { grid-template-columns: 1fr; }
-  /* On a phone the passage belongs above the notes, where it is glanced at. */
-  .sermon-side { order: -1; }
-}
+@media (max-width: 900px) { .sermon-grid { grid-template-columns: 1fr; gap: 0; } }
 .sermon-side { position: sticky; top: 60px; }
 @media (max-width: 900px) { .sermon-side { position: static; } }
 
+/* One tap between the notes and the text, instead of scrolling between them */
+.segmented {
+  display: flex; gap: 0; margin-bottom: 10px;
+  border: 1px solid var(--accent); border-radius: 9px; overflow: hidden;
+}
+.segmented button {
+  flex: 1 1 0; padding: 9px 8px; min-height: 42px;
+  background: transparent; color: var(--accent); border: none;
+  font-family: var(--sans); font-size: 0.92rem; cursor: pointer;
+}
+.segmented button.on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+
+.sermon-flash {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(78px + env(safe-area-inset-bottom, 0px)); z-index: 30;
+  background: var(--ink); color: var(--bg);
+  padding: 8px 14px; border-radius: 999px; font-size: 0.85rem;
+}
+
+.sermon-title { width: 100%; font-weight: 600; margin-bottom: 8px; }
 .sermon-meta { margin-bottom: 4px; }
-.sermon-meta input { flex: 1 1 130px; min-width: 0; }
-.sermon-referror { color: var(--accent); }
+.sermon-meta input { flex: 1 1 140px; min-width: 0; }
+.sermon-idea { min-height: 58px; }
+
+.sermon-refline { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+.sermon-refline input { flex: 1 1 auto; min-width: 0; }
+.sermon-refline input.bad { border-color: var(--accent); }
+.sermon-refline .tag { flex: 0 0 auto; margin: 0; }
 
 .sermon-point { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
-.sermon-point-ref { width: 108px; flex: 0 0 auto; font-size: 0.8rem; padding: 6px 8px; }
+.sermon-point-ref { width: 96px; flex: 0 0 auto; font-size: 0.78rem; padding: 6px 8px; }
 .sermon-point-text { flex: 1 1 auto; min-width: 0; }
-.sermon-point .linklike { padding: 2px 4px; }
+.sermon-point .linklike, .sermon-refline .linklike {
+  padding: 4px 6px; min-width: 30px; min-height: 32px;
+}
+
+.sermon-actions { position: sticky; bottom: 76px; z-index: 8; }
+.sermon-folds { padding: 4px 14px; }
 
 .sermon-passage { max-height: 70vh; overflow-y: auto; }
-@media (max-width: 900px) { .sermon-passage { max-height: 42vh; } }
+@media (max-width: 900px) {
+  /* On a phone the passage gets the screen, since it is the other half of the work. */
+  .sermon-passage { max-height: calc(100dvh - 210px); }
+}
 .sermon-text { font-size: 1.02rem; line-height: 1.75; }
 .sermon-passage-head { margin: 10px 0 4px; font-size: 0.9rem; color: var(--muted); font-family: var(--sans); }
 .sermon-selbar {
   position: sticky; bottom: 0; background: var(--panel);
   border-top: 1px solid var(--border); padding: 6px 0 2px; margin-top: 6px;
 }
-.sermon-hint { margin: 8px 0 4px; }
 .sermon-ref { color: var(--accent); font-weight: 600; }
+
+/* Folded-away parts of a long form */
+.fold { border-bottom: 1px solid var(--border); }
+.fold:last-child { border-bottom: none; }
+.fold-head {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  background: none; border: none; color: var(--ink); cursor: pointer;
+  font-family: var(--sans); font-size: 0.95rem; text-align: left;
+  padding: 12px 0; min-height: 46px;
+}
+.fold-chevron { color: var(--muted); width: 12px; }
+.fold-label { font-weight: 600; }
+.fold-badge {
+  background: var(--border); color: var(--ink);
+  border-radius: 999px; padding: 1px 8px; font-size: 0.75rem;
+}
+.fold-body { padding-bottom: 12px; }
+
+/* Everything that is set up once, behind one More button */
+.sheet-scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); z-index: 11; }
+.sheet {
+  position: fixed; z-index: 12;
+  left: 0; right: 0; bottom: calc(58px + env(safe-area-inset-bottom, 0px));
+  background: var(--panel); border-top: 1px solid var(--border);
+  border-radius: 14px 14px 0 0; padding: 6px 0;
+  max-width: 860px; margin: 0 auto;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.18);
+}
+.sheet-item {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  background: none; border: none; color: var(--ink); cursor: pointer;
+  font-family: var(--sans); font-size: 1rem; text-align: left;
+  padding: 12px 18px; min-height: 52px;
+}
+.sheet-item .icon { font-size: 1.3rem; }
+.sheet-item.active { color: var(--accent); font-weight: 600; }
+.sheet-label { display: block; }
+.sheet-note { display: block; color: var(--muted); font-size: 0.78rem; }
 
 /* Which build this device is running, and taking a newer one */
 .buildstamp { color: var(--muted); font-size: 0.7rem; font-variant-numeric: tabular-nums; }

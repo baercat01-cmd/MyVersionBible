@@ -56,12 +56,6 @@ export default function SermonView() {
       {notes.length === 0 && (
         <div className="card">
           <h3>Notes while you listen</h3>
-          <p className="muted small">
-            Put in the reference being preached on and the passage opens beside your notes —
-            its background, its cross references, and the Hebrew or Greek behind any word you
-            tap. Capture points straight off the text as you hear them, then turn the whole
-            thing into a study of your own afterwards.
-          </p>
           <button className="btn" onClick={() => setEditing('new')}>Start a sermon note</button>
         </div>
       )}

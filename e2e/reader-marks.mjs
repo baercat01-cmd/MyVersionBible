@@ -4,6 +4,7 @@
 // Run with:  npm run build && npx vite preview --port 4173 &
 //            npm i --no-save playwright && node e2e/reader-marks.mjs
 import { chromium } from 'playwright'
+import { navTo } from './nav.mjs'
 
 const BASE = process.env.BASE_URL || 'http://localhost:4173/'
 const fail = m => { console.error('FAIL: ' + m); process.exitCode = 1 }
@@ -11,12 +12,13 @@ const ok = m => console.log('  ok - ' + m)
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' })
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+const tab = navTo(page)
 const cardFile = t => page.locator('.card').filter({ hasText: t }).locator('input[type=file]').first()
 page.on('pageerror', e => fail('page error: ' + e.message))
 await page.goto(BASE, { waitUntil: 'networkidle' })
 
 // 1. Import the fixture translation.
-await page.getByRole('button', { name: /Versions/ }).click()
+await tab('Versions')
 await cardFile('Import a translation from a file').setInputFiles(new URL('./fixture-TESTV.json', import.meta.url).pathname)
 await page.waitForSelector('text=/TESTV/', { timeout: 15000 })
 ok('translation imported and listed')

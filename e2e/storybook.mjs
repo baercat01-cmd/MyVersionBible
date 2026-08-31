@@ -1,16 +1,18 @@
 // Importing a public-domain narrative retelling and reading it.
 import { chromium } from 'playwright'
+import { navTo } from './nav.mjs'
 const BASE = process.env.BASE_URL || 'http://localhost:4173/'
 const fail = m => { console.error('FAIL: ' + m); process.exitCode = 1 }
 const ok = m => console.log('  ok - ' + m)
 const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' })
 const page = await browser.newPage({ viewport: { width: 1100, height: 860 } })
+const tab = navTo(page)
 const cardFile = t => page.locator('.card').filter({ hasText: t }).locator('input[type=file]').first()
 page.on('pageerror', e => fail('page error: ' + e.message))
 await page.goto(BASE, { waitUntil: 'networkidle' })
 
-await page.getByRole('button', { name: /Versions/ }).click()
+await tab('Versions')
 await page.waitForSelector('text=Story books')
 await cardFile('Story books').setInputFiles(
   new URL('./fixture-storybook.txt', import.meta.url).pathname)
@@ -33,7 +35,7 @@ await page.waitForSelector('text=/read it in the Story tab/', { timeout: 10000 }
 ok('story book saved to the device')
 
 // Read it.
-await page.getByRole('button', { name: /Story/ }).click()
+await tab('Story')
 await page.waitForSelector('.segment-head h2')
 // With no translation downloaded the app opens straight into the retelling;
 // with one, pick it from the order dropdown.

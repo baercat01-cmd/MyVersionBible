@@ -1,5 +1,6 @@
 // Version descriptions in the Versions tab.
 import { chromium } from 'playwright'
+import { navTo } from './nav.mjs'
 const BASE = process.env.BASE_URL || 'http://localhost:4173/'
 const fail = m => { console.error('FAIL: ' + m); process.exitCode = 1 }
 const ok = m => console.log('  ok - ' + m)
@@ -8,9 +9,9 @@ const browser = await chromium.launch({
 const page = await browser.newPage({ viewport: { width: 1200, height: 950 } })
 page.on('pageerror', e => fail('page error: ' + e.message))
 await page.goto(BASE, { waitUntil: 'networkidle' })
-const tab = n => page.locator('.tabbar button').filter({ hasText: n }).first()
+const tab = navTo(page)
 
-await tab('Versions').click()
+await tab('Versions')
 await page.waitForSelector('.verrow')
 
 // Match on the row's id heading — other versions mention "KJV" in their text.

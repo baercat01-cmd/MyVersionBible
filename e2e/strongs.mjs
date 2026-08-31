@@ -1,5 +1,6 @@
 // Strong's numbers: parsed on import, shown on tap, searchable.
 import { chromium } from 'playwright'
+import { navTo } from './nav.mjs'
 const BASE = process.env.BASE_URL || 'http://localhost:4173/'
 const fail = m => { console.error('FAIL: ' + m); process.exitCode = 1 }
 const ok = m => console.log('  ok - ' + m)
@@ -9,16 +10,16 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
 const cardFile = t => page.locator('.card').filter({ hasText: t }).locator('input[type=file]').first()
 page.on('pageerror', e => fail('page error: ' + e.message))
 await page.goto(BASE, { waitUntil: 'networkidle' })
-const tab = name => page.locator('.tabbar button').filter({ hasText: name }).first()
+const tab = navTo(page)
 
-await tab('Versions').click()
+await tab('Versions')
 await cardFile('Import a translation from a file').setInputFiles(
   new URL('./fixture-STRONGS.json', import.meta.url).pathname)
 await page.waitForSelector('text=/FIXTURE-STRONGS/', { timeout: 15000 })
 ok('tagged translation imported')
 
 // The tags must be parsed out of the text, not left in it.
-await tab('Read').click()
+await tab('Read')
 await page.waitForSelector('.verse .word')
 await page.selectOption('select >> nth=1', '1')
 await page.waitForTimeout(400)
@@ -78,7 +79,7 @@ if (!/^G\d+$/.test(ntCode)) fail('New Testament code should be prefixed G, got '
 else ok('New Testament words get a G prefix: ' + ntCode)
 
 // Import a lexicon file and check it takes precedence / fills gaps.
-await tab('Versions').click()
+await tab('Versions')
 await page.waitForSelector('text=Hebrew and Greek lexicon')
 await cardFile('Hebrew and Greek lexicon').setInputFiles(
   new URL('./fixture-lexicon.json', import.meta.url).pathname)

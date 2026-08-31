@@ -1,5 +1,6 @@
 // Cross references: the bundled core set, the importer, and the panel.
 import { chromium } from 'playwright'
+import { navTo } from './nav.mjs'
 const BASE = process.env.BASE_URL || 'http://localhost:4173/'
 const fail = m => { console.error('FAIL: ' + m); process.exitCode = 1 }
 const ok = m => console.log('  ok - ' + m)
@@ -10,14 +11,14 @@ const cardFile = t => page.locator('.card').filter({ hasText: t }).locator('inpu
 page.on('pageerror', e => fail('page error: ' + e.message))
 await page.goto(BASE, { waitUntil: 'networkidle' })
 
-const tab = name => page.locator('.tabbar button').filter({ hasText: name }).first()
-await tab('Versions').click()
+const tab = navTo(page)
+await tab('Versions')
 await cardFile('Import a translation from a file').setInputFiles(
   new URL('./fixture-TESTV.json', import.meta.url).pathname)
 await page.waitForSelector('text=/TESTV/', { timeout: 15000 })
 
 // The bundled core set works with no import at all.
-await tab('Read').click()
+await tab('Read')
 await page.waitForSelector('.verse .word')
 await page.selectOption('select >> nth=1', '1')       // Genesis
 await page.waitForTimeout(400)
@@ -42,7 +43,7 @@ if (!/John 1/.test(heading)) fail('cross reference did not jump: ' + heading)
 else ok('clicking a cross reference opens that passage')
 
 // Now import the full-format file.
-await tab('Versions').click()
+await tab('Versions')
 await page.waitForSelector('text=Cross references')
 await cardFile('Cross references').setInputFiles(
   new URL('./fixture-xrefs.txt', import.meta.url).pathname)
@@ -55,7 +56,7 @@ if (!/2 lines skipped/.test(msg)) fail('should report skipped lines: ' + msg)
 else ok('low-voted and unrecognised lines are skipped and reported')
 
 // Imported refs merge with the bundled ones, without duplicates.
-await tab('Read').click()
+await tab('Read')
 await page.waitForSelector('.verse .word')
 await page.selectOption('select >> nth=1', '1')
 await page.waitForTimeout(400)

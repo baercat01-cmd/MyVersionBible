@@ -1,5 +1,6 @@
 // Finding links between your own studies, entirely on the device.
 import { chromium } from 'playwright'
+import { navTo } from './nav.mjs'
 const BASE = process.env.BASE_URL || 'http://localhost:4173/'
 const fail = m => { console.error('FAIL: ' + m); process.exitCode = 1 }
 const ok = m => console.log('  ok - ' + m)
@@ -12,16 +13,16 @@ page.on('pageerror', e => fail('page error: ' + e.message))
 const external = []
 page.on('request', r => { const u = r.url(); if (!u.startsWith(BASE) && !u.startsWith('data:')) external.push(u) })
 await page.goto(BASE, { waitUntil: 'networkidle' })
-const tab = n => page.locator('.tabbar button').filter({ hasText: n }).first()
+const tab = navTo(page)
 
-await tab('Versions').click()
+await tab('Versions')
 await cardFile('Import a translation from a file').setInputFiles(
   new URL('./fixture-TESTV.json', import.meta.url).pathname)
 await page.waitForSelector('text=/TESTV/', { timeout: 15000 })
 
 // Write three studies that overlap in different ways.
 const writeStudy = async (title, body, tags, book, verse) => {
-  await tab('Read').click()
+  await tab('Read')
   await page.waitForSelector('.verse .word')
   await page.selectOption('select >> nth=1', String(book))
   await page.waitForTimeout(350)
@@ -54,7 +55,7 @@ ok('four studies written, three sharing a theme')
 // on the device. (Downloading versions obviously does, hence the reset.)
 external.length = 0
 
-await tab('Study').click()
+await tab('Study')
 await page.waitForSelector('.card')
 await page.waitForTimeout(400)
 

@@ -1,6 +1,7 @@
 // Integration test: chronological/story reading, and the stylus drawing layer
 // mounted in the real reader. See reader-marks.mjs for the run instructions.
 import { chromium } from 'playwright'
+import { navTo } from './nav.mjs'
 
 const BASE = process.env.BASE_URL || 'http://localhost:4173/'
 const fail = m => { console.error('FAIL: ' + m); process.exitCode = 1 }
@@ -9,17 +10,18 @@ const CHROME = process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-li
 
 const browser = await chromium.launch({ executablePath: CHROME })
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+const tab = navTo(page)
 const cardFile = t => page.locator('.card').filter({ hasText: t }).locator('input[type=file]').first()
 page.on('pageerror', e => fail('page error: ' + e.message))
 await page.goto(BASE, { waitUntil: 'networkidle' })
 
-await page.getByRole('button', { name: /Versions/ }).click()
+await tab('Versions')
 await cardFile('Import a translation from a file').setInputFiles(new URL('./fixture-TESTV.json', import.meta.url).pathname)
 await page.waitForSelector('text=/TESTV/', { timeout: 15000 })
 ok('fixture translation imported')
 
 // ---------- Chronological / story reading ----------
-await page.getByRole('button', { name: /Story/ }).click()
+await tab('Story')
 await page.waitForSelector('.segment-head h2', { timeout: 10000 })
 const firstTitle = await page.locator('.segment-head h2').innerText()
 if (!/creation/i.test(firstTitle)) fail('chronological order should open at the creation, got: ' + firstTitle)
@@ -54,7 +56,7 @@ await page.reload({ waitUntil: 'networkidle' })
 await page.waitForTimeout(400)
 if (await page.locator('.segment-head h2').count() === 0) {
   fail('app did not reopen on the tab it was left on')
-  await page.getByRole('button', { name: /Story/ }).click()
+  await tab('Story')
 }
 await page.waitForSelector('.segment-head h2', { timeout: 10000 })
 await page.waitForTimeout(600)
