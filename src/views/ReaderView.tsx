@@ -11,6 +11,10 @@ import NotesPanel from '../components/NotesPanel'
 import VerseText from '../components/VerseText'
 import DrawLayer from '../components/DrawLayer'
 import { onJump, takeJump } from '../lib/nav'
+import CrossRefs from '../components/CrossRefs'
+import StrongsInfo from '../components/StrongsInfo'
+import ContextPanel from '../components/ContextPanel'
+import AddToCollection from '../components/AddToCollection'
 
 interface Position { translation: string; book: number; chapter: number; parallel: string }
 
@@ -35,6 +39,7 @@ export default function ReaderView() {
   // The drawing canvas overlays this column, so strokes sit over the text.
   const readerCol = useRef<HTMLDivElement>(null)
   const [flashVerse, setFlashVerse] = useState<number | null>(null)
+  const [collecting, setCollecting] = useState(false)
 
   const translations = useLiveQuery(() => db.translations.toArray(), []) || []
 
@@ -100,6 +105,13 @@ export default function ReaderView() {
       .sort((a, b) => (verseOf(a) - verseOf(b)) || a.created_at.localeCompare(b.created_at)),
     [anchored]
   )
+
+  // Strong's codes on the word currently selected, if the version carries them.
+  const selectedCodes = useMemo(() => {
+    if (!sel || sel.words.length !== 1 || !chapterRec) return []
+    const v = chapterRec.verses.find(x => x.v === sel.verse)
+    return v?.s?.[String(sel.words[0])] || []
+  }, [sel, chapterRec])
 
   function verseOf(n: NoteRec): number {
     const r = n.refs.find(x => x.book === pos.book && x.chapter === pos.chapter)
@@ -240,7 +252,18 @@ export default function ReaderView() {
             onOpen={n => setEditing(n)}
             onNew={() => setEditing('new')}
             canAdd={!!sel}
-          />
+          >
+            <ContextPanel book={pos.book} />
+            {selectedCodes.length > 0 && (
+              <StrongsInfo codes={selectedCodes} translation={pos.translation} />
+            )}
+            {sel && (
+              <CrossRefs
+                book={pos.book} chapter={pos.chapter} verse={sel.verse}
+                translation={pos.translation}
+              />
+            )}
+          </NotesPanel>
         )}
       </div>
 
@@ -272,10 +295,20 @@ export default function ReaderView() {
               >{s.glyph}</button>
             ))}
           </div>
+          <button
+            className="btn secondary small"
+            onClick={() => setShowPanel(true)}
+            title="Cross references for this verse"
+          >⇄ Refs</button>
           <button className="btn secondary small" onClick={erase} title="Erase marks here">Erase</button>
           <button className="btn small" onClick={() => setEditing('new')}>+ Note</button>
+          <button className="btn small" onClick={() => setCollecting(true)}>+ List</button>
           <button className="btn secondary small" onClick={() => setSel(null)} aria-label="Close">✕</button>
         </div>
+      )}
+
+      {collecting && sel && (
+        <AddToCollection verseRef={selectionRef()} onDone={() => { setCollecting(false); setSel(null) }} />
       )}
 
       {editing && (

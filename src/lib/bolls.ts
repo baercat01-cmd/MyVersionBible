@@ -3,6 +3,7 @@
 // browser and are stored fully offline in IndexedDB.
 import { db, chapterKey, type BookMeta, type ChapterRec } from './db'
 import { BOOK_NAMES } from './books'
+import { parseVerse } from './strongs'
 
 const BASE = 'https://bolls.life'
 
@@ -37,14 +38,9 @@ export async function fetchCatalog(): Promise<CatalogLanguage[]> {
 
 interface RawVerse { book: number; chapter: number; verse: number; text: string }
 
-// bolls texts can carry markup (<br/>, Strong's <S>…</S>, notes) — strip to plain text.
+// Kept for callers that only want the words.
 export function cleanVerseText(t: string): string {
-  return t
-    .replace(/<S>[^<]*<\/S>/g, '')
-    .replace(/<br\s*\/?>/gi, ' ')
-    .replace(/<[^>]+>/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
+  return parseVerse(t, 'H').text
 }
 
 async function fetchBookNames(id: string): Promise<Record<number, string>> {
@@ -90,7 +86,14 @@ export async function storeTranslation(
       ch = { key, translation: id, book: v.book, chapter: v.chapter, verses: [] }
       chapters.set(key, ch)
     }
-    ch.verses.push({ v: v.verse, t: cleanVerseText(v.text) })
+    // Books 1-39 are Hebrew, 40-66 Greek; Strong's numbers are only unique
+    // within their own testament, so the prefix has to come from the book.
+    const parsed = parseVerse(v.text, v.book >= 40 ? 'G' : 'H')
+    ch.verses.push(
+      Object.keys(parsed.strongs).length
+        ? { v: v.verse, t: parsed.text, s: parsed.strongs }
+        : { v: v.verse, t: parsed.text }
+    )
     bookChapters.set(v.book, Math.max(bookChapters.get(v.book) || 0, v.chapter))
   }
 

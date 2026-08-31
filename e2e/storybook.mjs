@@ -1,16 +1,18 @@
 // Importing a public-domain narrative retelling and reading it.
 import { chromium } from 'playwright'
+const BASE = process.env.BASE_URL || 'http://localhost:4173/'
 const fail = m => { console.error('FAIL: ' + m); process.exitCode = 1 }
 const ok = m => console.log('  ok - ' + m)
 const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' })
 const page = await browser.newPage({ viewport: { width: 1100, height: 860 } })
+const cardFile = t => page.locator('.card').filter({ hasText: t }).locator('input[type=file]').first()
 page.on('pageerror', e => fail('page error: ' + e.message))
-await page.goto('http://localhost:4173/', { waitUntil: 'networkidle' })
+await page.goto(BASE, { waitUntil: 'networkidle' })
 
 await page.getByRole('button', { name: /Versions/ }).click()
 await page.waitForSelector('text=Story books')
-await page.locator('input[accept*="txt"]').setInputFiles(
+await cardFile('Story books').setInputFiles(
   new URL('./fixture-storybook.txt', import.meta.url).pathname)
 await page.waitForSelector('text=/chapters found/', { timeout: 10000 })
 

@@ -2,17 +2,19 @@
 // mounted in the real reader. See reader-marks.mjs for the run instructions.
 import { chromium } from 'playwright'
 
+const BASE = process.env.BASE_URL || 'http://localhost:4173/'
 const fail = m => { console.error('FAIL: ' + m); process.exitCode = 1 }
 const ok = m => console.log('  ok - ' + m)
 const CHROME = process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'
 
 const browser = await chromium.launch({ executablePath: CHROME })
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+const cardFile = t => page.locator('.card').filter({ hasText: t }).locator('input[type=file]').first()
 page.on('pageerror', e => fail('page error: ' + e.message))
-await page.goto('http://localhost:4173/', { waitUntil: 'networkidle' })
+await page.goto(BASE, { waitUntil: 'networkidle' })
 
 await page.getByRole('button', { name: /Versions/ }).click()
-await page.locator('input[accept*="json"]').setInputFiles(new URL('./fixture-TESTV.json', import.meta.url).pathname)
+await cardFile('Import a translation from a file').setInputFiles(new URL('./fixture-TESTV.json', import.meta.url).pathname)
 await page.waitForSelector('text=/TESTV/', { timeout: 15000 })
 ok('fixture translation imported')
 
@@ -89,8 +91,10 @@ ok('verse selection still works with the drawing layer mounted')
 await page.locator('.actionbar button[aria-label=Close]').click()
 
 // Turn drawing on and draw a stroke with a synthetic pen.
-const toggle = page.locator('.dl-bar button').first()
-await toggle.click()
+// The tools live in a side drawer now: open the handle, then flip drawing on.
+await page.locator('.dl-handle').click()
+await page.locator('.dl-drawer .dl-toggle').click()
+await page.keyboard.press('Escape')            // close the drawer; drawing stays on
 await page.waitForTimeout(200)
 const box = await page.locator('.dl-canvas').boundingBox()
 if (!box) fail('no canvas box')

@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { supabase, syncNotes, signInWithEmail, signOut } from '../lib/supabase'
 import { syncStrokes } from '../lib/strokes'
+import { syncCollections } from '../lib/collections'
 
 export default function AccountView() {
   const [user, setUser] = useState<User | null>(null)
@@ -38,8 +39,9 @@ export default function AccountView() {
     try {
       const r = await syncNotes()
       const d = await syncStrokes()
+      const l = await syncCollections()
       setStatus(
-        `Synced — ${r.pushed + d.pushed} pushed, ${r.pulled + d.pulled} pulled` +
+        `Synced — ${r.pushed + d.pushed + l.pushed} pushed, ${r.pulled + d.pulled + l.pulled} pulled` +
         (d.pushed || d.pulled ? ` (${d.pushed + d.pulled} drawing strokes).` : '.')
       )
     } catch (e) {

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { NoteRec } from '../lib/db'
 import { getTemplate } from '../lib/templates'
 import { formatRefs } from '../lib/refs'
@@ -8,15 +9,19 @@ interface Props {
   onOpen: (note: NoteRec) => void
   onNew: () => void
   canAdd: boolean
+  /** Rendered above the notes — the cross references for the current selection. */
+  children?: ReactNode
 }
 
 /** Study notes for the chapter on screen, shown beside the text. */
-export default function NotesPanel({ notes, reference, onOpen, onNew, canAdd }: Props) {
+export default function NotesPanel({ notes, reference, onOpen, onNew, canAdd, children }: Props) {
   return (
     <aside className="notescol no-print">
       <div className="notescol-head">
         <strong>Notes · {reference}</strong>
       </div>
+
+      {children}
 
       {notes.length === 0 && (
         <p className="muted small">

@@ -1,15 +1,17 @@
 // Scripture search: matching, options, and jumping to the verse.
 import { chromium } from 'playwright'
+const BASE = process.env.BASE_URL || 'http://localhost:4173/'
 const fail = m => { console.error('FAIL: ' + m); process.exitCode = 1 }
 const ok = m => console.log('  ok - ' + m)
 const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' })
 const page = await browser.newPage({ viewport: { width: 1200, height: 900 } })
+const cardFile = t => page.locator('.card').filter({ hasText: t }).locator('input[type=file]').first()
 page.on('pageerror', e => fail('page error: ' + e.message))
-await page.goto('http://localhost:4173/', { waitUntil: 'networkidle' })
+await page.goto(BASE, { waitUntil: 'networkidle' })
 
 await page.getByRole('button', { name: /Versions/ }).click()
-await page.locator('input[accept*="json"]').setInputFiles(
+await cardFile('Import a translation from a file').setInputFiles(
   new URL('./fixture-TESTV.json', import.meta.url).pathname)
 await page.waitForSelector('text=/TESTV/', { timeout: 15000 })
 
