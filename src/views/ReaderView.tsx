@@ -288,6 +288,7 @@ export default function ReaderView() {
             onOpen={n => setEditing(n)}
             onNew={() => setEditing('new')}
             canAdd={!!sel}
+            onClose={() => setShowPanel(false)}
           >
             <ContextPanel book={pos.book} />
             {selectedCodes.length > 0 && (

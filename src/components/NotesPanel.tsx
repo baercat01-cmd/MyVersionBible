@@ -9,16 +9,21 @@ interface Props {
   onOpen: (note: NoteRec) => void
   onNew: () => void
   canAdd: boolean
+  /** Close the panel — the only obvious way out when it covers the text. */
+  onClose?: () => void
   /** Rendered above the notes — the cross references for the current selection. */
   children?: ReactNode
 }
 
 /** Study notes for the chapter on screen, shown beside the text. */
-export default function NotesPanel({ notes, reference, onOpen, onNew, canAdd, children }: Props) {
+export default function NotesPanel({ notes, reference, onOpen, onNew, canAdd, children, onClose }: Props) {
   return (
     <aside className="notescol no-print">
       <div className="notescol-head">
         <strong>Notes · {reference}</strong>
+        {onClose && (
+          <button className="notescol-close" onClick={onClose} aria-label="Close notes">✕</button>
+        )}
       </div>
 
       {children}
