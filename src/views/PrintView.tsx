@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, getChapter, type NoteRec, type VerseRef } from '../lib/db'
 import { getTemplate } from '../lib/templates'
+import { sermonSubtitle } from '../lib/sermons'
 import { formatRef, formatRefs } from '../lib/refs'
 
 // Pull the actual verse text for a ref out of a downloaded translation.
@@ -108,6 +109,7 @@ export default function PrintView() {
         <div className="row">
           <button className="btn secondary small" onClick={() => selectAll('study')}>All studies</button>
           <button className="btn secondary small" onClick={() => selectAll('journal')}>All journal</button>
+          <button className="btn secondary small" onClick={() => selectAll('sermon')}>All sermon notes</button>
           <button className="btn secondary small" onClick={() => selectAll('verse')}>All verse notes</button>
           <button className="btn secondary small" onClick={() => setSelectedIds(new Set())}>Clear</button>
         </div>
@@ -120,7 +122,10 @@ export default function PrintView() {
           <div>
             <strong>{n.title || (n.refs.length ? formatRefs(n.refs) : 'Untitled')}</strong>
             <div className="meta">
-              {n.kind === 'study' ? getTemplate(n.template)?.name || 'Study' : n.kind === 'journal' ? 'Journal' : 'Verse note'}
+              {n.kind === 'study' ? getTemplate(n.template)?.name || 'Study'
+                : n.kind === 'journal' ? 'Journal'
+                : n.kind === 'sermon' ? 'Sermon notes'
+                : 'Verse note'}
               {' · '}{new Date(n.updated_at).toLocaleDateString()}
             </div>
           </div>
@@ -141,6 +146,9 @@ function BookNote({ note, verseTexts }: { note: NoteRec; verseTexts: Map<string,
   return (
     <div className="book-note">
       <h2>{note.title || (note.refs.length ? formatRefs(note.refs) : 'Untitled')}</h2>
+      {note.kind === 'sermon' && sermonSubtitle(note) && (
+        <div className="refline">{sermonSubtitle(note)}</div>
+      )}
       {note.refs.length > 0 && <div className="refline">{formatRefs(note.refs)}</div>}
       {note.refs.map(r => {
         const t = verseTexts.get(`${note.id}:${formatRef(r)}`)

@@ -18,7 +18,9 @@ export default function NoteEditor({ note, kind, refs, onDone }: Props) {
   const [tags, setTags] = useState((note?.tags || []).join(', '))
   const [saving, setSaving] = useState(false)
 
-  const template = kind === 'study' ? getTemplate(templateId) : undefined
+  // Studies pick a template here; sermon notes arrive carrying their own, and
+  // are edited through the same section fields rather than losing them.
+  const template = kind === 'study' || note?.template ? getTemplate(templateId) : undefined
   const anchoredRefs = note?.refs?.length ? note.refs : (refs || [])
 
   async function handleSave() {

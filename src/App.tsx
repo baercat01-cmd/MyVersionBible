@@ -6,15 +6,17 @@ import SearchView from './views/SearchView'
 import CollectionsView from './views/CollectionsView'
 import VersionsView from './views/VersionsView'
 import StudyView from './views/StudyView'
+import SermonView from './views/SermonView'
 import PrintView from './views/PrintView'
 import AccountView from './views/AccountView'
 
-type Tab = 'read' | 'story' | 'search' | 'study' | 'lists' | 'versions' | 'print' | 'account'
+type Tab = 'read' | 'story' | 'search' | 'sermon' | 'study' | 'lists' | 'versions' | 'print' | 'account'
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'read', label: 'Read', icon: '📖' },
   { id: 'story', label: 'Story', icon: '🕰️' },
   { id: 'search', label: 'Search', icon: '🔍' },
+  { id: 'sermon', label: 'Sermon', icon: '🎤' },
   { id: 'study', label: 'Study', icon: '✏️' },
   { id: 'lists', label: 'Lists', icon: '🔖' },
   { id: 'versions', label: 'Versions', icon: '⬇️' },
@@ -44,6 +46,7 @@ export default function App() {
         {tab === 'read' && <ReaderView />}
         {tab === 'story' && <ChronoView />}
         {tab === 'search' && <SearchView />}
+        {tab === 'sermon' && <SermonView />}
         {tab === 'study' && <StudyView />}
         {tab === 'lists' && <CollectionsView />}
         {tab === 'versions' && <VersionsView />}

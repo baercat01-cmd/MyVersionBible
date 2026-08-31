@@ -15,6 +15,13 @@ e-readers (Boox) through one PWA.
   - *Structured studies*: SOAP, Inductive, Word Study, Character Study, and
     Chapter Summary templates.
   - *Journal*: freeform entries.
+  - *Sermon notes*: taken as a listener — put in the reference being preached
+    on and the passage opens beside the notes, with its historical background,
+    cross references, and the Hebrew or Greek behind any word you tap. Points
+    can be captured straight off the text, original words dropped into the
+    notes with their meaning, and the whole sermon turned into an inductive
+    study of your own afterwards. Saves as you type, since a sermon does not
+    wait.
 - **Sync** — notes save locally first and sync to a private Supabase backend
   (shared with the Vesper project, table `mvb_notes`, strict per-user RLS)
   when signed in and online. Last-write-wins, works fine offline for weeks.
@@ -46,5 +53,7 @@ use "Add to Home Screen" / "Install app".
 ## Backend
 
 `supabase/migrations/` holds the schema applied to the shared Supabase project
-(`mvb_notes` + RLS). The client uses only the publishable key; every row is
+(`mvb_notes` + RLS). Each migration has to be applied to the project before the
+feature it backs will sync — `20260903_mvb_sermons.sql` widens the note-kind
+constraint for sermon notes. The client uses only the publishable key; every row is
 guarded by `auth.uid() = user_id` policies.

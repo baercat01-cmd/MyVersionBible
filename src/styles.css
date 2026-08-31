@@ -328,3 +328,33 @@ textarea { width: 100%; min-height: 90px; resize: vertical; line-height: 1.5; }
 
 /* Isolate the ink canvas so a stroke never repaints the text beneath it. */
 .dl-canvas { contain: strict; will-change: contents; }
+
+/* Sermon notes — the notes on one side, the passage on the other */
+.sermon-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 900px) {
+  .sermon-grid { grid-template-columns: 1fr; }
+  /* On a phone the passage belongs above the notes, where it is glanced at. */
+  .sermon-side { order: -1; }
+}
+.sermon-side { position: sticky; top: 60px; }
+@media (max-width: 900px) { .sermon-side { position: static; } }
+
+.sermon-meta { margin-bottom: 4px; }
+.sermon-meta input { flex: 1 1 130px; min-width: 0; }
+.sermon-referror { color: var(--accent); }
+
+.sermon-point { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+.sermon-point-ref { width: 108px; flex: 0 0 auto; font-size: 0.8rem; padding: 6px 8px; }
+.sermon-point-text { flex: 1 1 auto; min-width: 0; }
+.sermon-point .linklike { padding: 2px 4px; }
+
+.sermon-passage { max-height: 70vh; overflow-y: auto; }
+@media (max-width: 900px) { .sermon-passage { max-height: 42vh; } }
+.sermon-text { font-size: 1.02rem; line-height: 1.75; }
+.sermon-passage-head { margin: 10px 0 4px; font-size: 0.9rem; color: var(--muted); font-family: var(--sans); }
+.sermon-selbar {
+  position: sticky; bottom: 0; background: var(--panel);
+  border-top: 1px solid var(--border); padding: 6px 0 2px; margin-top: 6px;
+}
+.sermon-hint { margin: 8px 0 4px; }
+.sermon-ref { color: var(--accent); font-weight: 600; }

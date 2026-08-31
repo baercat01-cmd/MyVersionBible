@@ -37,7 +37,8 @@ export interface VerseRef {
 }
 
 // 'mark' = a visual mark drawn over the text (highlight, underline, box, strike).
-export type NoteKind = 'verse' | 'study' | 'journal' | 'mark'
+// 'sermon' = notes taken while listening to someone else preach.
+export type NoteKind = 'verse' | 'study' | 'journal' | 'mark' | 'sermon'
 
 export type MarkStyle = 'highlight' | 'underline' | 'box' | 'strike'
 

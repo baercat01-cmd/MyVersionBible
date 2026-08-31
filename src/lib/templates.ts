@@ -1,3 +1,5 @@
+import { SERMON_TEMPLATE } from './sermons'
+
 export interface StudyTemplate {
   id: string
   name: string
@@ -63,6 +65,15 @@ export const TEMPLATES: StudyTemplate[] = [
   }
 ]
 
+/**
+ * Sermon notes carry their own structure (lib/sermons.ts) and are written in
+ * their own tab, so the template is kept out of the "new study" list — but it
+ * is still resolved here, so a sermon prints and lists with proper headings.
+ */
 export function getTemplate(id: string | null): StudyTemplate | undefined {
-  return TEMPLATES.find(t => t.id === id)
+  const found = TEMPLATES.find(t => t.id === id)
+  if (found) return found
+  return id === SERMON_TEMPLATE.id
+    ? { ...SERMON_TEMPLATE, sections: SERMON_TEMPLATE.sections.map(s => ({ ...s })) }
+    : undefined
 }
