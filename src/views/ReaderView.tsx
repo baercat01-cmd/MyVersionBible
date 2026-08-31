@@ -13,6 +13,8 @@ import DrawLayer from '../components/DrawLayer'
 import { onJump, takeJump } from '../lib/nav'
 import CrossRefs from '../components/CrossRefs'
 import StrongsInfo from '../components/StrongsInfo'
+import ContextPanel from '../components/ContextPanel'
+import AddToCollection from '../components/AddToCollection'
 
 interface Position { translation: string; book: number; chapter: number; parallel: string }
 
@@ -37,6 +39,7 @@ export default function ReaderView() {
   // The drawing canvas overlays this column, so strokes sit over the text.
   const readerCol = useRef<HTMLDivElement>(null)
   const [flashVerse, setFlashVerse] = useState<number | null>(null)
+  const [collecting, setCollecting] = useState(false)
 
   const translations = useLiveQuery(() => db.translations.toArray(), []) || []
 
@@ -250,6 +253,7 @@ export default function ReaderView() {
             onNew={() => setEditing('new')}
             canAdd={!!sel}
           >
+            <ContextPanel book={pos.book} />
             {selectedCodes.length > 0 && (
               <StrongsInfo codes={selectedCodes} translation={pos.translation} />
             )}
@@ -298,8 +302,13 @@ export default function ReaderView() {
           >⇄ Refs</button>
           <button className="btn secondary small" onClick={erase} title="Erase marks here">Erase</button>
           <button className="btn small" onClick={() => setEditing('new')}>+ Note</button>
+          <button className="btn small" onClick={() => setCollecting(true)}>+ List</button>
           <button className="btn secondary small" onClick={() => setSel(null)} aria-label="Close">✕</button>
         </div>
+      )}
+
+      {collecting && sel && (
+        <AddToCollection verseRef={selectionRef()} onDone={() => { setCollecting(false); setSel(null) }} />
       )}
 
       {editing && (

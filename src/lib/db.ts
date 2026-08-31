@@ -71,6 +71,30 @@ export interface XrefRec {
   targets: string[]     // compact references, parsed by lib/passages.ts
 }
 
+/**
+ * A named list of verses gathered from anywhere in the Bible, with optional
+ * spaced-repetition review state per verse for memorising them.
+ */
+export interface CollectionItem {
+  ref: VerseRef
+  added_at: string
+  /** Review state — absent until the verse is first reviewed. */
+  box?: number          // 0-5; higher means seen correctly more often
+  due?: string          // ISO date this verse is next due
+}
+
+export interface CollectionRec {
+  id: string
+  name: string
+  description: string
+  items: CollectionItem[]
+  memorize: boolean
+  created_at: string
+  updated_at: string
+  deleted: 0 | 1
+  dirty: 0 | 1
+}
+
 /** One Strong's dictionary entry, keyed by its code (e.g. "H430"). */
 export interface LexRec {
   code: string
@@ -133,6 +157,7 @@ class MVBDatabase extends Dexie {
   storybooks!: Table<StoryBookRec, string>
   xrefs!: Table<XrefRec, string>
   lexicon!: Table<LexRec, string>
+  collections!: Table<CollectionRec, string>
   meta!: Table<MetaRec, string>
 
   constructor() {
@@ -192,6 +217,17 @@ class MVBDatabase extends Dexie {
       storybooks: 'id',
       xrefs: 'key',
       lexicon: 'code',
+      meta: 'key'
+    })
+    this.version(7).stores({
+      translations: 'id',
+      chapters: 'key, translation, [translation+book]',
+      notes: 'id, kind, updated_at, dirty, deleted, *chapterKeys',
+      strokes: 'id, pageKey, updated_at, dirty, deleted',
+      storybooks: 'id',
+      xrefs: 'key',
+      lexicon: 'code',
+      collections: 'id, updated_at, dirty, deleted',
       meta: 'key'
     })
   }

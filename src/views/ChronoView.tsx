@@ -11,6 +11,7 @@ import { buildPlan, getCompleted, toggleCompleted, getStartDate, startPlan, rese
 import { paragraphs } from '../lib/storybooks'
 import VerseText, { type Selection } from '../components/VerseText'
 import NoteEditor from '../components/NoteEditor'
+import ContextPanel from '../components/ContextPanel'
 
 // 'book:<id>' selects an imported narrative retelling.
 type Order = 'chronological' | 'harmony' | string
@@ -266,6 +267,11 @@ export default function ChronoView() {
               {' · '}segment {clamped + 1} of {segments.length}
             </div>
             {segment.note && <p className="placement-note">ⓘ {segment.note}</p>}
+            <ContextPanel
+              book={loaded && loaded.length ? loaded[0].book : undefined}
+              era={segment.era}
+              eraTitle={eraOf?.title}
+            />
           </div>
 
           {segment.refs.length > 0 && loaded === null && <p className="muted">Loading…</p>}

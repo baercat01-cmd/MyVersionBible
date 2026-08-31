@@ -5,6 +5,7 @@
 //            npm i --no-save playwright && node e2e/reader-marks.mjs
 import { chromium } from 'playwright'
 
+const BASE = process.env.BASE_URL || 'http://localhost:4173/'
 const fail = m => { console.error('FAIL: ' + m); process.exitCode = 1 }
 const ok = m => console.log('  ok - ' + m)
 
@@ -12,7 +13,7 @@ const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || 
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
 const cardFile = t => page.locator('.card').filter({ hasText: t }).locator('input[type=file]').first()
 page.on('pageerror', e => fail('page error: ' + e.message))
-await page.goto('http://localhost:4174/', { waitUntil: 'networkidle' })
+await page.goto(BASE, { waitUntil: 'networkidle' })
 
 // 1. Import the fixture translation.
 await page.getByRole('button', { name: /Versions/ }).click()

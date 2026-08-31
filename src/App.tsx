@@ -3,18 +3,20 @@ import { onJump } from './lib/nav'
 import ReaderView from './views/ReaderView'
 import ChronoView from './views/ChronoView'
 import SearchView from './views/SearchView'
+import CollectionsView from './views/CollectionsView'
 import VersionsView from './views/VersionsView'
 import StudyView from './views/StudyView'
 import PrintView from './views/PrintView'
 import AccountView from './views/AccountView'
 
-type Tab = 'read' | 'story' | 'search' | 'study' | 'versions' | 'print' | 'account'
+type Tab = 'read' | 'story' | 'search' | 'study' | 'lists' | 'versions' | 'print' | 'account'
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'read', label: 'Read', icon: '📖' },
   { id: 'story', label: 'Story', icon: '🕰️' },
   { id: 'search', label: 'Search', icon: '🔍' },
   { id: 'study', label: 'Study', icon: '✏️' },
+  { id: 'lists', label: 'Lists', icon: '🔖' },
   { id: 'versions', label: 'Versions', icon: '⬇️' },
   { id: 'print', label: 'Print', icon: '🖨️' },
   { id: 'account', label: 'Sync', icon: '☁️' }
@@ -43,6 +45,7 @@ export default function App() {
         {tab === 'story' && <ChronoView />}
         {tab === 'search' && <SearchView />}
         {tab === 'study' && <StudyView />}
+        {tab === 'lists' && <CollectionsView />}
         {tab === 'versions' && <VersionsView />}
         {tab === 'print' && <PrintView />}
         {tab === 'account' && <AccountView />}
