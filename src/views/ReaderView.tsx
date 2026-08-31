@@ -1,13 +1,15 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
   db, getChapter, notesInChapter, saveMark, eraseMarks,
   type MarkStyle, type NoteRec, type VerseRef
 } from '../lib/db'
 import { bookName } from '../lib/books'
-import { MARK_COLORS, MARK_STYLES, colorHex, tokenize, marksForVerse, markStyle } from '../lib/marks'
+import { MARK_COLORS, MARK_STYLES, colorHex } from '../lib/marks'
 import NoteEditor from '../components/NoteEditor'
 import NotesPanel from '../components/NotesPanel'
+import VerseText from '../components/VerseText'
+import DrawLayer from '../components/DrawLayer'
 
 interface Position { translation: string; book: number; chapter: number; parallel: string }
 
@@ -23,15 +25,14 @@ function loadPos(): Position {
   return { translation: '', book: 43, chapter: 1, parallel: '' }
 }
 
-/** A selection is one verse, either whole (words empty) or specific words. */
-interface Selection { verse: number; words: number[] }
-
 export default function ReaderView() {
   const [pos, setPos] = useState<Position>(loadPos)
-  const [sel, setSel] = useState<Selection | null>(null)
+  const [sel, setSel] = useState<{ verse: number; words: number[] } | null>(null)
   const [editing, setEditing] = useState<NoteRec | 'new' | null>(null)
   const [color, setColor] = useState(() => localStorage.getItem(COLOR_KEY) || 'yellow')
   const [showPanel, setShowPanel] = useState(() => localStorage.getItem(PANEL_KEY) !== '0')
+  // The drawing canvas overlays this column, so strokes sit over the text.
+  const readerCol = useRef<HTMLDivElement>(null)
 
   const translations = useLiveQuery(() => db.translations.toArray(), []) || []
 
@@ -77,7 +78,7 @@ export default function ReaderView() {
     return r ? r.v1 : 0
   }
 
-  function selectWord(verse: number, wordIndex: number) {
+  function selectWord(_book: number, _chapter: number, verse: number, wordIndex: number) {
     setSel(prev => {
       if (!prev || prev.verse !== verse) return { verse, words: [wordIndex] }
       if (!prev.words.length) return { verse, words: [wordIndex] }   // was whole-verse
@@ -88,7 +89,7 @@ export default function ReaderView() {
     })
   }
 
-  function selectVerse(verse: number) {
+  function selectVerse(_book: number, _chapter: number, verse: number) {
     setSel(prev => (prev && prev.verse === verse && !prev.words.length) ? null : { verse, words: [] })
   }
 
@@ -164,16 +165,17 @@ export default function ReaderView() {
       </div>
 
       <div className={`readerwrap ${showPanel ? 'with-panel' : ''}`}>
-        <div className="readercol">
+        <div className="readercol" ref={readerCol}>
           <div className={`reader ${parallelRec ? 'parallel' : ''}`}>
             <div className={isRTL ? 'rtl' : ''}>
               <h2>{bookName(pos.book, bookMeta?.name)} {pos.chapter} <span className="muted small">({pos.translation})</span></h2>
               {!chapterRec && <p className="muted">Chapter not found in this version.</p>}
               {chapterRec?.verses.map(({ v, t }) => (
-                <Verse
+                <VerseText
                   key={v} verse={v} text={t} marks={marks}
                   book={pos.book} chapter={pos.chapter}
-                  sel={sel} onWord={selectWord} onVerse={selectVerse}
+                  sel={sel ? { book: pos.book, chapter: pos.chapter, ...sel } : null}
+                  onWord={selectWord} onVerse={selectVerse}
                 />
               ))}
             </div>
@@ -194,6 +196,13 @@ export default function ReaderView() {
             <button className="btn secondary" onClick={() => goChapter(1)}>Next →</button>
           </div>
         </div>
+
+        <DrawLayer
+          translation={pos.translation}
+          book={pos.book}
+          chapter={pos.chapter}
+          containerRef={readerCol}
+        />
 
         {showPanel && (
           <NotesPanel
@@ -251,43 +260,5 @@ export default function ReaderView() {
         </div>
       )}
     </div>
-  )
-}
-
-function Verse({ verse, text, marks, book, chapter, sel, onWord, onVerse }: {
-  verse: number
-  text: string
-  marks: NoteRec[]
-  book: number
-  chapter: number
-  sel: Selection | null
-  onWord: (verse: number, i: number) => void
-  onVerse: (verse: number) => void
-}) {
-  const words = useMemo(() => tokenize(text), [text])
-  const applied = useMemo(
-    () => marksForVerse(marks, book, chapter, verse, words.length),
-    [marks, book, chapter, verse, words.length]
-  )
-  const verseSelected = sel?.verse === verse && !sel.words.length
-
-  return (
-    <span className={`verse ${verseSelected ? 'selected' : ''}`}>
-      <span className="vnum" onClick={() => onVerse(verse)} title="Select the whole verse">{verse}</span>
-      {words.map((w, i) => {
-        const wordSelected = sel?.verse === verse && sel.words.includes(i)
-        return (
-          <Fragment key={i}>
-            {i > 0 && ' '}
-            <span
-              className={`word ${wordSelected ? 'wsel' : ''}`}
-              style={markStyle(applied.get(i))}
-              onClick={() => onWord(verse, i)}
-            >{w}</span>
-          </Fragment>
-        )
-      })}
-      {' '}
-    </span>
   )
 }
