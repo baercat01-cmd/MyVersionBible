@@ -14,6 +14,8 @@ import { paragraphs } from '../lib/storybooks'
 import VerseText from '../components/VerseText'
 import NoteEditor from '../components/NoteEditor'
 import ContextPanel from '../components/ContextPanel'
+import AudioPlayer from '../components/AudioPlayer'
+import { useSpeech } from '../lib/speech'
 
 // 'book:<id>' selects an imported narrative retelling.
 type Order = 'chronological' | 'harmony' | string
@@ -36,6 +38,7 @@ export default function ChronoView() {
   } = useSelection()
   const [loaded, setLoaded] = useState<LoadedChapter[] | null>(null)
   const [showPlan, setShowPlan] = useState(false)
+  const [speakingKey, setSpeakingKey] = useState<string | null>(null)
 
   const translations = useLiveQuery(() => db.translations.toArray(), []) || []
   const storyBooks = useLiveQuery(() => db.storybooks.toArray(), []) || []
@@ -104,6 +107,27 @@ export default function ChronoView() {
   useEffect(() => { getCompleted().then(setCompletedState); getStartDate().then(setPlanStart) }, [])
 
   const eraOf = ERAS.find(e => e.id === segment?.era)
+
+  // Read the whole segment aloud, chapter by chapter, and move to the next
+  // segment when auto-continue is on.
+  const speech = useSpeech(
+    v => setSpeakingKey(v === null ? null : String(v)),
+    () => {
+      if (speech.autoContinue && clamped < segments.length - 1) {
+        setIndex(clamped + 1)
+        window.scrollTo(0, 0)
+      }
+    }
+  )
+
+  function segmentAudio() {
+    if (activeBook && bookChapter) {
+      return paragraphs(bookChapter.text).map((text, i) => ({ verse: i + 1, text }))
+    }
+    return (loaded || []).flatMap(ch => ch.verses.map(v => ({ verse: v.v, text: v.t })))
+  }
+
+  useEffect(() => { speech.stop() }, [clamped, order, translation])
 
   function selectionRef(): VerseRef {
     return selRef(translation) ?? { book: 1, chapter: 1, v1: 1, v2: 1, translation }
@@ -225,6 +249,7 @@ export default function ChronoView() {
             <button className="btn secondary small" onClick={() => setShowPlan(true)}>🗓 Plan</button>
           </>
         )}
+        <AudioPlayer speech={speech} onPlay={() => speech.play(segmentAudio())} />
       </div>
 
       {activeBook && bookChapter && (
@@ -281,6 +306,7 @@ export default function ChronoView() {
                     key={v} verse={v} text={t} marks={marks}
                     book={ch.book} chapter={ch.chapter}
                     sel={sel} story={story}
+                    speaking={speakingKey === String(v)}
                     onWord={onWord} onVerse={onVerse}
                     onDragOver={onDragOver} onMeasure={measure}
                   />

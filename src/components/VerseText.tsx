@@ -16,6 +16,8 @@ interface Props {
   story?: boolean
   /** Briefly highlighted after jumping here from search or a cross reference. */
   flash?: boolean
+  /** Currently being read aloud. */
+  speaking?: boolean
   onWord: (book: number, chapter: number, verse: number, i: number) => void
   onVerse: (book: number, chapter: number, verse: number) => void
   /** Pointer dragged across a word — extends the range without starting a new one. */
@@ -29,7 +31,8 @@ interface Props {
  * reader and the chronological reader so marking behaves identically in both.
  */
 export default function VerseText({
-  book, chapter, verse, text, marks, sel, story, flash, onWord, onVerse, onDragOver, onMeasure
+  book, chapter, verse, text, marks, sel, story, flash, speaking,
+  onWord, onVerse, onDragOver, onMeasure
 }: Props) {
   const words = useMemo(() => tokenize(text), [text])
   const applied = useMemo(
@@ -40,7 +43,7 @@ export default function VerseText({
 
   return (
     <span
-      className={`verse ${flash ? 'flash' : ''}`}
+      className={`verse ${flash ? 'flash' : ''} ${speaking ? 'speaking' : ''}`}
       data-verse={`${book}-${chapter}-${verse}`}
     >
       {!story && (
