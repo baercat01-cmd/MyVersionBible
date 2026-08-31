@@ -11,6 +11,7 @@ import NotesPanel from '../components/NotesPanel'
 import VerseText from '../components/VerseText'
 import DrawLayer from '../components/DrawLayer'
 import { onJump, takeJump } from '../lib/nav'
+import CrossRefs from '../components/CrossRefs'
 
 interface Position { translation: string; book: number; chapter: number; parallel: string }
 
@@ -240,7 +241,14 @@ export default function ReaderView() {
             onOpen={n => setEditing(n)}
             onNew={() => setEditing('new')}
             canAdd={!!sel}
-          />
+          >
+            {sel && (
+              <CrossRefs
+                book={pos.book} chapter={pos.chapter} verse={sel.verse}
+                translation={pos.translation}
+              />
+            )}
+          </NotesPanel>
         )}
       </div>
 
@@ -272,6 +280,11 @@ export default function ReaderView() {
               >{s.glyph}</button>
             ))}
           </div>
+          <button
+            className="btn secondary small"
+            onClick={() => setShowPanel(true)}
+            title="Cross references for this verse"
+          >⇄ Refs</button>
           <button className="btn secondary small" onClick={erase} title="Erase marks here">Erase</button>
           <button className="btn small" onClick={() => setEditing('new')}>+ Note</button>
           <button className="btn secondary small" onClick={() => setSel(null)} aria-label="Close">✕</button>

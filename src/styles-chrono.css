@@ -71,3 +71,17 @@
   0%, 45% { background: var(--highlight-yellow); }
   100% { background: transparent; }
 }
+
+/* Cross references */
+.xref-block { border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 4px; }
+.xref-head { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+.xref {
+  display: block; width: 100%; text-align: left; cursor: pointer;
+  background: transparent; color: var(--ink); border: none;
+  border-left: 2px solid var(--border); padding: 3px 0 3px 8px;
+  margin-bottom: 4px; font-family: var(--sans); font-size: 0.82rem;
+}
+.xref:hover { border-left-color: var(--accent); }
+.xref-ref { display: block; color: var(--accent); font-weight: 600; }
+.xref-text { display: block; font-family: var(--serif); line-height: 1.45; }

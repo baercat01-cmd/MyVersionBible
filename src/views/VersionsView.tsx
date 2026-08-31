@@ -6,6 +6,7 @@ import {
   storeTranslation, type CatalogLanguage
 } from '../lib/bolls'
 import StoryBookImport from '../components/StoryBookImport'
+import StudyDataImport from '../components/StudyDataImport'
 
 const ALL = '__all__'
 
@@ -160,6 +161,8 @@ export default function VersionsView() {
           </p>
         )}
       </div>
+
+      <StudyDataImport />
 
       <StoryBookImport />
 

@@ -58,6 +58,15 @@ export interface NoteRec {
 export interface MetaRec { key: string; value: string }
 
 /**
+ * Cross references for one verse. Keyed `${book}:${chapter}:${verse}` so a
+ * lookup while reading is a single indexed get.
+ */
+export interface XrefRec {
+  key: string
+  targets: string[]     // compact references, parsed by lib/passages.ts
+}
+
+/**
  * A freehand stylus stroke drawn over a chapter.
  * Points are normalised to the width of the text column (x in 0..1, y in the
  * same units) so drawings stay put when the window, font size or device changes.
@@ -107,6 +116,7 @@ class MVBDatabase extends Dexie {
   notes!: Table<NoteRec, string>
   strokes!: Table<StrokeRec, string>
   storybooks!: Table<StoryBookRec, string>
+  xrefs!: Table<XrefRec, string>
   meta!: Table<MetaRec, string>
 
   constructor() {
@@ -147,6 +157,15 @@ class MVBDatabase extends Dexie {
       notes: 'id, kind, updated_at, dirty, deleted, *chapterKeys',
       strokes: 'id, pageKey, updated_at, dirty, deleted',
       storybooks: 'id',
+      meta: 'key'
+    })
+    this.version(5).stores({
+      translations: 'id',
+      chapters: 'key, translation, [translation+book]',
+      notes: 'id, kind, updated_at, dirty, deleted, *chapterKeys',
+      strokes: 'id, pageKey, updated_at, dirty, deleted',
+      storybooks: 'id',
+      xrefs: 'key',
       meta: 'key'
     })
   }

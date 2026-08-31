@@ -1,0 +1,11 @@
+From Verse	To Verse	Votes
+Gen.1.1	John.1.1	72
+Gen.1.1	Heb.11.3	54
+Gen.1.1	Col.1.16-Col.1.17	31
+Gen.2.1	Exod.20.11	12
+Gen.3.1	Rev.12.9	40
+Gen.3.1	2Cor.11.3	22
+Gen.3.1	John.8.44	-3
+John.1.1	Gen.1.1	68
+John.2.1	John.4.46	9
+Bogus.9.9	John.1.1	5
