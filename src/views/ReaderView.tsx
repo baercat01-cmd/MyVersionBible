@@ -17,6 +17,9 @@ import CrossRefs from '../components/CrossRefs'
 import StrongsInfo from '../components/StrongsInfo'
 import ContextPanel from '../components/ContextPanel'
 import AddToCollection from '../components/AddToCollection'
+import AudioPlayer from '../components/AudioPlayer'
+import { useSpeech } from '../lib/speech'
+import { ordered as orderedSel } from '../lib/selection'
 
 interface Position { translation: string; book: number; chapter: number; parallel: string }
 
@@ -41,6 +44,7 @@ export default function ReaderView() {
   const readerCol = useRef<HTMLDivElement>(null)
   const [flashVerse, setFlashVerse] = useState<number | null>(null)
   const [collecting, setCollecting] = useState(false)
+  const [speakingVerse, setSpeakingVerse] = useState<number | null>(null)
   const {
     sel, clear, onWord, onVerse, onDragOver, expandVerses, selectChapter,
     selectionRef: selRef, perVerse, measure, label, isSingleWord
@@ -121,6 +125,30 @@ export default function ReaderView() {
 
   // Cross references are shown for every verse the selection touches.
   const selectedVerses = useMemo(() => (sel ? verseRange(sel) : []), [sel])
+
+  // Reading aloud. Auto-continue moves to the next chapter and keeps going.
+  const speech = useSpeech(setSpeakingVerse, () => {
+    if (speech.autoContinue) { goChapter(1); setTimeout(() => startListening(true), 700) }
+  })
+
+  function startListening(fromStart = false) {
+    const verses = chapterRec?.verses
+    if (!verses?.length) return
+    const from = !fromStart && sel ? orderedSel(sel).start.verse : undefined
+    speech.play(verses.map(v => ({ verse: v.v, text: v.t })), from)
+    clear()
+  }
+
+  // Keep the verse being read in view.
+  useEffect(() => {
+    if (speakingVerse === null) return
+    document
+      .querySelector(`[data-verse="${pos.book}-${pos.chapter}-${speakingVerse}"]`)
+      ?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, [speakingVerse, pos.book, pos.chapter])
+
+  // Stop reading if the passage changes underneath it.
+  useEffect(() => { speech.stop() }, [pos.book, pos.chapter, pos.translation])
 
   function verseOf(n: NoteRec): number {
     const r = n.refs.find(x => x.book === pos.book && x.chapter === pos.chapter)
@@ -203,6 +231,11 @@ export default function ReaderView() {
         >
           📝 Notes{noteCount ? ` (${noteCount})` : ''}
         </button>
+        <AudioPlayer
+          speech={speech}
+          onPlay={() => startListening()}
+          fromLabel={sel ? `v${orderedSel(sel).start.verse}` : undefined}
+        />
       </div>
 
       <div className={`readerwrap ${showPanel ? 'with-panel' : ''}`}>
@@ -217,6 +250,7 @@ export default function ReaderView() {
                   book={pos.book} chapter={pos.chapter}
                   sel={sel}
                   flash={flashVerse === v}
+                  speaking={speakingVerse === v}
                   onWord={onWord} onVerse={onVerse}
                   onDragOver={onDragOver} onMeasure={measure}
                 />
