@@ -1,0 +1,43 @@
+/* Chronological reading, story view and the reading plan. */
+
+.segment-head { margin-bottom: 16px; }
+.era-label {
+  font-family: var(--sans); font-size: 0.72rem; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--accent); font-weight: 700;
+}
+.segment-head h2 { margin: 4px 0 4px; font-size: 1.5rem; }
+.placement-note {
+  font-family: var(--sans); font-size: 0.82rem; color: var(--muted);
+  border-left: 3px solid var(--border); padding: 6px 10px; margin: 10px 0 0;
+  background: var(--panel); border-radius: 0 6px 6px 0;
+}
+
+.chrono-chapter { margin-top: 18px; }
+.chapter-label {
+  font-family: var(--sans); font-size: 0.78rem; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--muted); margin: 16px 0 6px;
+}
+
+/* Story view: continuous prose, no verse numbers, generous measure. */
+.reader.storyview { font-size: 1.16rem; line-height: 1.95; }
+.reader.storyview .chapter-label { opacity: 0.55; }
+.reader.storyview .prose { text-align: left; }
+.reader.storyview .prose .verse { display: inline; }
+.vhandle {
+  display: inline-block; width: 0.32em; cursor: pointer;
+  vertical-align: baseline;
+}
+.vhandle:hover { background: var(--border); border-radius: 2px; }
+
+/* Reading plan */
+.planday.today { border-color: var(--accent); border-width: 2px; }
+.planday.done { opacity: 0.62; }
+.planseg { align-items: baseline; padding: 3px 0; gap: 6px; }
+.planseg .meta { font-size: 0.78rem; }
+.linklike {
+  background: none; border: none; padding: 0; cursor: pointer;
+  color: var(--ink); font-family: var(--sans); font-size: 0.9rem;
+  text-align: left; text-decoration: underline; text-decoration-color: var(--border);
+}
+.linklike:hover { color: var(--accent); }

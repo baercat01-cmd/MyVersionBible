@@ -57,6 +57,31 @@ export interface NoteRec {
 
 export interface MetaRec { key: string; value: string }
 
+/**
+ * A freehand stylus stroke drawn over a chapter.
+ * Points are normalised to the width of the text column (x in 0..1, y in the
+ * same units) so drawings stay put when the window, font size or device changes.
+ */
+export interface StrokeRec {
+  id: string
+  pageKey: string          // `${translation}:${book}:${chapter}`
+  translation: string
+  book: number
+  chapter: number
+  tool: 'pen' | 'marker'
+  color: string            // hex
+  width: number            // normalised stroke width
+  points: number[]         // flat [x0,y0,x1,y1,...]
+  created_at: string
+  updated_at: string
+  deleted: 0 | 1
+  dirty: 0 | 1
+}
+
+export function pageKey(translation: string, book: number, chapter: number): string {
+  return `${translation}:${book}:${chapter}`
+}
+
 // Local-only multiEntry index so a chapter's marks and notes load without
 // scanning every note on the device.
 export function refChapterKeys(refs: VerseRef[]): string[] {
@@ -67,6 +92,7 @@ class MVBDatabase extends Dexie {
   translations!: Table<TranslationRec, string>
   chapters!: Table<ChapterRec, string>
   notes!: Table<NoteRec, string>
+  strokes!: Table<StrokeRec, string>
   meta!: Table<MetaRec, string>
 
   constructor() {
@@ -94,6 +120,13 @@ class MVBDatabase extends Dexie {
       n.words = n.words ?? null
       n.chapterKeys = refChapterKeys(n.refs || [])
     }))
+    this.version(3).stores({
+      translations: 'id',
+      chapters: 'key, translation, [translation+book]',
+      notes: 'id, kind, updated_at, dirty, deleted, *chapterKeys',
+      strokes: 'id, pageKey, updated_at, dirty, deleted',
+      meta: 'key'
+    })
   }
 }
 

@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { supabase, syncNotes, signInWithEmail, signOut } from '../lib/supabase'
+import { syncStrokes } from '../lib/strokes'
 
 export default function AccountView() {
   const [user, setUser] = useState<User | null>(null)
@@ -36,7 +37,11 @@ export default function AccountView() {
     setBusy(true); setStatus('Syncing…')
     try {
       const r = await syncNotes()
-      setStatus(`Synced — ${r.pushed} pushed, ${r.pulled} pulled.`)
+      const d = await syncStrokes()
+      setStatus(
+        `Synced — ${r.pushed + d.pushed} pushed, ${r.pulled + d.pulled} pulled` +
+        (d.pushed || d.pulled ? ` (${d.pushed + d.pulled} drawing strokes).` : '.')
+      )
     } catch (e) {
       setStatus(`Sync failed: ${e instanceof Error ? e.message : e}`)
     } finally { setBusy(false) }
