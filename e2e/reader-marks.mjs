@@ -15,7 +15,7 @@ await page.goto('http://localhost:4173/', { waitUntil: 'networkidle' })
 
 // 1. Import the fixture translation.
 await page.getByRole('button', { name: /Versions/ }).click()
-await page.locator('input[type=file]').setInputFiles(new URL('./fixture-TESTV.json', import.meta.url).pathname)
+await page.locator('input[accept*="json"]').setInputFiles(new URL('./fixture-TESTV.json', import.meta.url).pathname)
 await page.waitForSelector('text=/TESTV/', { timeout: 15000 })
 ok('translation imported and listed')
 

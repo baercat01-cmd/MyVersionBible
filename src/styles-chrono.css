@@ -41,3 +41,10 @@
   text-align: left; text-decoration: underline; text-decoration-color: var(--border);
 }
 .linklike:hover { color: var(--accent); }
+
+/* Imported narrative retellings */
+.story-para {
+  font-family: var(--serif); font-size: 1.1rem; line-height: 1.85;
+  margin: 0 0 1em; text-indent: 1.4em;
+}
+.story-para:first-of-type { text-indent: 0; }

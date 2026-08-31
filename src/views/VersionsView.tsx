@@ -5,6 +5,7 @@ import {
   FEATURED, fetchCatalog, downloadTranslation, removeTranslation,
   storeTranslation, type CatalogLanguage
 } from '../lib/bolls'
+import StoryBookImport from '../components/StoryBookImport'
 
 const ALL = '__all__'
 
@@ -160,8 +161,10 @@ export default function VersionsView() {
         )}
       </div>
 
+      <StoryBookImport />
+
       <div className="card">
-        <h3>Import from file</h3>
+        <h3>Import a translation from a file</h3>
         <p className="muted small">
           Load a translation from a JSON file (array of <code>{'{book, chapter, verse, text}'}</code>) —
           useful if a download source is unreachable.
