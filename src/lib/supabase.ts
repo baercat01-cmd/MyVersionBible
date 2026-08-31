@@ -2,7 +2,7 @@
 // Notes live in the `mvb_notes` table, locked down with RLS per-user.
 // The app is fully usable offline / signed out; sync is additive.
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { db, nowISO, type NoteRec } from './db'
+import { db, nowISO, refChapterKeys, type MarkStyle, type NoteRec } from './db'
 
 const SUPABASE_URL = 'https://kcmjuunzagqyyxxgjxuq.supabase.co'
 const SUPABASE_KEY = 'sb_publishable_gAkzYzLumBBZ-KyC8r8fTQ_z-Mp7HP7'
@@ -19,6 +19,8 @@ interface RemoteNote {
   refs: NoteRec['refs']
   tags: string[]
   color: string | null
+  style: MarkStyle | null
+  words: number[] | null
   created_at: string
   updated_at: string
   deleted: boolean
@@ -35,6 +37,8 @@ function toRemote(n: NoteRec) {
     refs: n.refs,
     tags: n.tags,
     color: n.color,
+    style: n.style,
+    words: n.words,
     created_at: n.created_at,
     updated_at: n.updated_at,
     deleted: !!n.deleted
@@ -52,10 +56,13 @@ function toLocal(r: RemoteNote): NoteRec {
     refs: r.refs || [],
     tags: r.tags || [],
     color: r.color,
+    style: r.style ?? null,
+    words: r.words ?? null,
     created_at: r.created_at,
     updated_at: r.updated_at,
     deleted: r.deleted ? 1 : 0,
-    dirty: 0
+    dirty: 0,
+    chapterKeys: refChapterKeys(r.refs || [])
   }
 }
 

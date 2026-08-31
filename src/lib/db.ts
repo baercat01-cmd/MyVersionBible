@@ -31,7 +31,10 @@ export interface VerseRef {
   translation?: string
 }
 
-export type NoteKind = 'verse' | 'study' | 'journal'
+// 'mark' = a visual mark drawn over the text (highlight, underline, box, strike).
+export type NoteKind = 'verse' | 'study' | 'journal' | 'mark'
+
+export type MarkStyle = 'highlight' | 'underline' | 'box' | 'strike'
 
 export interface NoteRec {
   id: string
@@ -42,14 +45,23 @@ export interface NoteRec {
   sections: Record<string, string> | null    // template section id -> text
   refs: VerseRef[]
   tags: string[]
-  color: string | null                       // highlight color for verse notes
+  color: string | null                       // mark colour id
+  style: MarkStyle | null                    // how a mark is drawn
+  words: number[] | null                     // word indices within the verse; null = whole verse
   created_at: string
   updated_at: string
   deleted: 0 | 1
   dirty: 0 | 1
+  chapterKeys?: string[]                     // local-only index: `${book}:${chapter}` per ref
 }
 
 export interface MetaRec { key: string; value: string }
+
+// Local-only multiEntry index so a chapter's marks and notes load without
+// scanning every note on the device.
+export function refChapterKeys(refs: VerseRef[]): string[] {
+  return [...new Set(refs.map(r => `${r.book}:${r.chapter}`))]
+}
 
 class MVBDatabase extends Dexie {
   translations!: Table<TranslationRec, string>
@@ -65,6 +77,23 @@ class MVBDatabase extends Dexie {
       notes: 'id, kind, updated_at, dirty, deleted',
       meta: 'key'
     })
+    this.version(2).stores({
+      translations: 'id',
+      chapters: 'key, translation, [translation+book]',
+      notes: 'id, kind, updated_at, dirty, deleted, *chapterKeys',
+      meta: 'key'
+    }).upgrade(tx => tx.table('notes').toCollection().modify((n: NoteRec) => {
+      // Highlights used to be stored as empty 'verse' notes carrying a colour.
+      // Promote those to first-class marks so they keep rendering over the text.
+      if (n.kind === 'verse' && n.color && !n.content && !n.title) {
+        n.kind = 'mark'
+        n.style = 'highlight'
+        n.dirty = 1
+      }
+      n.style = n.style ?? null
+      n.words = n.words ?? null
+      n.chapterKeys = refChapterKeys(n.refs || [])
+    }))
   }
 }
 
@@ -86,8 +115,15 @@ export function nowISO(): string {
   return new Date().toISOString()
 }
 
+/** All notes and marks anchored anywhere in one chapter. */
+export async function notesInChapter(book: number, chapter: number): Promise<NoteRec[]> {
+  const hits = await db.notes.where('chapterKeys').equals(`${book}:${chapter}`).toArray()
+  return hits.filter(n => !n.deleted)
+}
+
 export async function saveNote(note: Partial<NoteRec> & { id?: string }): Promise<NoteRec> {
   const existing = note.id ? await db.notes.get(note.id) : undefined
+  const refs = note.refs ?? existing?.refs ?? []
   const rec: NoteRec = {
     id: note.id || uuid(),
     kind: note.kind ?? existing?.kind ?? 'journal',
@@ -95,13 +131,16 @@ export async function saveNote(note: Partial<NoteRec> & { id?: string }): Promis
     content: note.content ?? existing?.content ?? '',
     template: note.template ?? existing?.template ?? null,
     sections: note.sections ?? existing?.sections ?? null,
-    refs: note.refs ?? existing?.refs ?? [],
+    refs,
     tags: note.tags ?? existing?.tags ?? [],
     color: note.color !== undefined ? note.color : (existing?.color ?? null),
+    style: note.style !== undefined ? note.style : (existing?.style ?? null),
+    words: note.words !== undefined ? note.words : (existing?.words ?? null),
     created_at: existing?.created_at ?? nowISO(),
     updated_at: nowISO(),
     deleted: 0,
-    dirty: 1
+    dirty: 1,
+    chapterKeys: refChapterKeys(refs)
   }
   await db.notes.put(rec)
   return rec
@@ -111,4 +150,45 @@ export async function deleteNote(id: string) {
   const existing = await db.notes.get(id)
   if (!existing) return
   await db.notes.put({ ...existing, deleted: 1, dirty: 1, updated_at: nowISO() })
+}
+
+/** Add a mark over a whole verse range, or over specific words of one verse. */
+export async function saveMark(
+  ref: VerseRef,
+  style: MarkStyle,
+  color: string,
+  words: number[] | null
+): Promise<NoteRec> {
+  return saveNote({
+    kind: 'mark',
+    title: '',
+    content: '',
+    refs: [ref],
+    color,
+    style,
+    words: words && words.length ? [...words].sort((a, b) => a - b) : null
+  })
+}
+
+/**
+ * Erase marks touching a selection. A whole-verse selection clears every mark on
+ * that verse; a word selection clears only marks covering those words.
+ */
+export async function eraseMarks(
+  book: number,
+  chapter: number,
+  verse: number,
+  words: number[] | null
+): Promise<number> {
+  const inChapter = await notesInChapter(book, chapter)
+  const hits = inChapter.filter(n => {
+    if (n.kind !== 'mark') return false
+    const covers = n.refs.some(r => r.book === book && r.chapter === chapter && verse >= r.v1 && verse <= r.v2)
+    if (!covers) return false
+    if (!words || !words.length) return true          // clearing the whole verse
+    if (!n.words) return true                          // whole-verse mark under a word selection
+    return n.words.some(w => words.includes(w))
+  })
+  for (const h of hits) await deleteNote(h.id)
+  return hits.length
 }
