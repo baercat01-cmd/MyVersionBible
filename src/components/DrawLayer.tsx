@@ -60,7 +60,8 @@ const K = {
   tool: 'mvb-draw-tool',
   color: 'mvb-draw-color',
   width: 'mvb-draw-width',
-  finger: 'mvb-draw-finger'
+  finger: 'mvb-draw-finger',
+  drawer: 'mvb-draw-drawer'
 }
 
 function readLS(key: string, fallback: string): string {
@@ -97,11 +98,15 @@ export default function DrawLayer({
     return n >= 0 && n < WIDTHS.length ? n : 1
   })
   const [allowFinger, setAllowFinger] = useState(() => readLS(K.finger, '0') === '1')
+  /* Drawer open/closed is independent of drawing mode: closing the tools does
+     not put the pen down. */
+  const [drawerOpen, setDrawerOpen] = useState(() => readLS(K.drawer, '0') === '1')
 
   useEffect(() => { writeLS(K.tool, tool) }, [tool])
   useEffect(() => { writeLS(K.color, colorId) }, [colorId])
   useEffect(() => { writeLS(K.width, String(widthIdx)) }, [widthIdx])
   useEffect(() => { writeLS(K.finger, allowFinger ? '1' : '0') }, [allowFinger])
+  useEffect(() => { writeLS(K.drawer, drawerOpen ? '1' : '0') }, [drawerOpen])
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [host, setHost] = useState<HTMLElement | null>(null)
@@ -376,6 +381,24 @@ export default function DrawLayer({
     await clearPage(translation, book, chapter)
   }, [translation, book, chapter])
 
+  /* Dismiss the drawer on Escape or a tap outside it. Drawing mode is untouched. */
+  const dockRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!showToolbar || !drawerOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setDrawerOpen(false) }
+    const onDown = (e: PointerEvent) => {
+      const dock = dockRef.current
+      if (dock && e.target instanceof Node && !dock.contains(e.target)) setDrawerOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    // Capture phase: the canvas swallows its own pointer events while drawing.
+    document.addEventListener('pointerdown', onDown, true)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('pointerdown', onDown, true)
+    }
+  }, [showToolbar, drawerOpen])
+
   const hex = useMemo(() => colorHex(colorId), [colorId])
   const canvas = host
     ? createPortal(
@@ -393,58 +416,63 @@ export default function DrawLayer({
     <>
       {canvas}
       {showToolbar && (
-        <div className="dl-bar no-print">
-          <button
-            className={`btn small ${on ? '' : 'secondary'}`}
-            onClick={() => setOn(!on)}
-            aria-pressed={on}
-            title="Draw freehand over the page"
-          >✏️ Draw</button>
+        <div
+          ref={dockRef}
+          className={`dl-dock no-print ${drawerOpen ? 'dl-open' : ''} ${on ? 'dl-armed' : ''}`}
+        >
+          {drawerOpen && (
+            <div className="dl-drawer" role="group" aria-label="Drawing tools">
+              <button
+                className={`btn small dl-toggle ${on ? '' : 'secondary'}`}
+                onClick={() => setOn(!on)}
+                aria-pressed={on}
+                title="Draw freehand over the page"
+              >{on ? 'Drawing on' : 'Drawing off'}</button>
 
-          {on && (
-            <>
-              <span className="dl-sep" />
-              <button
-                className={`btn small markbtn ${tool === 'pen' ? 'dl-sel' : ''}`}
-                onClick={() => setTool('pen')} title="Pen" aria-label="Pen"
-              >✒︎</button>
-              <button
-                className={`btn small markbtn ${tool === 'marker' ? 'dl-sel' : ''}`}
-                onClick={() => setTool('marker')} title="Marker" aria-label="Marker"
-              >▨</button>
-              <button
-                className={`btn small markbtn ${tool === 'eraser' ? 'dl-sel' : ''}`}
-                onClick={() => setTool('eraser')} title="Eraser" aria-label="Eraser"
-              >⌫</button>
-
-              <span className="dl-sep" />
-              {MARK_COLORS.map(c => (
+              <div className="dl-grid dl-grid-3">
                 <button
-                  key={c.id}
-                  className={`swatch ${colorId === c.id ? 'active' : ''}`}
-                  style={{ background: c.hex }}
-                  onClick={() => setColorId(c.id)}
-                  title={c.label}
-                  aria-label={c.label}
-                />
-              ))}
-
-              <span className="dl-sep" />
-              {WIDTHS.map((_, i) => (
+                  className={`btn small markbtn ${tool === 'pen' ? 'dl-sel' : ''}`}
+                  onClick={() => setTool('pen')} title="Pen" aria-label="Pen"
+                >&#x2712;&#xfe0e;</button>
                 <button
-                  key={i}
-                  className={`dl-width ${widthIdx === i ? 'active' : ''}`}
-                  onClick={() => setWidthIdx(i)}
-                  title={['Fine', 'Medium', 'Bold'][i]}
-                  aria-label={['Fine', 'Medium', 'Bold'][i]}
-                >
-                  <span style={{ background: hex, height: 2 + i * 3 }} />
-                </button>
-              ))}
+                  className={`btn small markbtn ${tool === 'marker' ? 'dl-sel' : ''}`}
+                  onClick={() => setTool('marker')} title="Marker" aria-label="Marker"
+                >&#x25a8;</button>
+                <button
+                  className={`btn small markbtn ${tool === 'eraser' ? 'dl-sel' : ''}`}
+                  onClick={() => setTool('eraser')} title="Eraser" aria-label="Eraser"
+                >&#x232b;</button>
+              </div>
 
-              <span className="dl-sep" />
-              <button className="btn secondary small" onClick={() => void undo()}>Undo</button>
-              <button className="btn secondary small" onClick={() => void clearAll()}>Clear page</button>
+              <div className="dl-grid dl-grid-3">
+                {MARK_COLORS.map(c => (
+                  <button
+                    key={c.id}
+                    className={`swatch ${colorId === c.id ? 'active' : ''}`}
+                    style={{ background: c.hex }}
+                    onClick={() => setColorId(c.id)}
+                    title={c.label}
+                    aria-label={c.label}
+                  />
+                ))}
+              </div>
+
+              <div className="dl-grid dl-grid-3">
+                {WIDTHS.map((_, i) => (
+                  <button
+                    key={i}
+                    className={`dl-width ${widthIdx === i ? 'active' : ''}`}
+                    onClick={() => setWidthIdx(i)}
+                    title={['Fine', 'Medium', 'Bold'][i]}
+                    aria-label={['Fine', 'Medium', 'Bold'][i]}
+                  >
+                    <span style={{ background: hex, height: 2 + i * 3 }} />
+                  </button>
+                ))}
+              </div>
+
+              <button className="btn secondary small dl-wide" onClick={() => void undo()}>Undo</button>
+              <button className="btn secondary small dl-wide" onClick={() => void clearAll()}>Clear page</button>
               <label className="dl-finger small" title="Let a fingertip draw too (off keeps the palm out)">
                 <input
                   type="checkbox"
@@ -453,8 +481,18 @@ export default function DrawLayer({
                 />
                 Finger
               </label>
-            </>
+            </div>
           )}
+
+          <button
+            className="dl-handle"
+            onClick={() => setDrawerOpen(o => !o)}
+            aria-expanded={drawerOpen}
+            aria-label={drawerOpen ? 'Close drawing tools' : 'Drawing tools'}
+            title={on ? 'Drawing tools (drawing is on)' : 'Drawing tools'}
+          >
+            <span className="dl-handle-icon" aria-hidden="true">&#x270f;&#xfe0f;</span>
+          </button>
         </div>
       )}
     </>

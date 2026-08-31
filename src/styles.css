@@ -227,30 +227,75 @@ textarea { width: 100%; min-height: 90px; resize: vertical; line-height: 1.5; }
   cursor: crosshair;
 }
 
-.dl-bar {
-  position: fixed; bottom: 112px; left: 50%; transform: translateX(-50%);
-  background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
-  box-shadow: 0 4px 18px rgba(0,0,0,0.22);
-  padding: 8px 12px; display: flex; gap: 6px; align-items: center; z-index: 21;
-  flex-wrap: wrap; max-width: 94vw;
+/* The tools live in a slim tab tucked against the RIGHT screen edge; tapping it
+   slides out a narrow vertical drawer. On wide screens the whole dock sits in
+   the gutter outside the 860px `.main`, so it never covers the text or the
+   320px notes column. No transitions — this has to behave on e-ink. */
+.dl-dock {
+  position: fixed; right: 0; top: 38%;
+  display: flex; align-items: flex-start; gap: 0;
+  z-index: 21;
 }
+
+.dl-handle {
+  flex: none;
+  width: 28px; min-height: 56px; padding: 6px 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--panel); color: var(--ink);
+  border: 1px solid var(--border); border-right: none;
+  border-radius: 10px 0 0 10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.18);
+  cursor: pointer; font-family: var(--sans); font-size: 1rem; line-height: 1;
+}
+/* Drawing mode on: the tab goes solid accent, so it is obvious at a glance why
+   taps are drawing instead of selecting words. */
+.dl-dock.dl-armed .dl-handle {
+  background: var(--accent); border-color: var(--accent); color: var(--accent-ink);
+}
+.dl-dock.dl-open .dl-handle { border-radius: 10px 0 0 10px; }
+.dl-handle-icon { display: block; }
+
+.dl-drawer {
+  width: 150px; max-height: calc(100dvh - 160px); overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 12px 0 0 12px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.22);
+  padding: 8px; display: flex; flex-direction: column; gap: 6px;
+}
+.dl-drawer .dl-toggle, .dl-drawer .dl-wide { width: 100%; min-height: 34px; }
+
+.dl-grid { display: grid; gap: 4px; }
+.dl-grid-3 { grid-template-columns: repeat(3, 1fr); }
+/* Keep every cell finger-sized even though the drawer is narrow. */
+.dl-grid > button { min-height: 38px; }
+.dl-grid > .swatch {
+  width: 100%; height: 38px; border-radius: 8px; justify-self: stretch;
+}
+
 .dl-sep { width: 1px; align-self: stretch; background: var(--border); margin: 0 2px; }
 
-.dl-bar .markbtn.dl-sel {
+.dl-drawer .markbtn.dl-sel {
   background: var(--accent); color: var(--accent-ink); border-color: var(--accent);
 }
 
 .dl-width {
-  width: 30px; height: 26px; padding: 0; cursor: pointer;
+  width: 100%; height: 38px; padding: 0; cursor: pointer;
   background: transparent; border: 1px solid var(--border); border-radius: 6px;
   display: flex; align-items: center; justify-content: center;
 }
 .dl-width span { display: block; width: 18px; border-radius: 999px; }
 .dl-width.active { border-color: var(--accent); background: var(--bg); }
 
-.dl-finger { display: flex; align-items: center; gap: 4px; color: var(--muted); cursor: pointer; }
-.dl-finger input { accent-color: var(--accent); }
+.dl-finger {
+  display: flex; align-items: center; gap: 6px; color: var(--muted);
+  cursor: pointer; min-height: 34px;
+}
+.dl-finger input { accent-color: var(--accent); width: 18px; height: 18px; }
 
 @media (max-width: 640px) {
-  .dl-bar { bottom: 104px; gap: 4px; padding: 6px 8px; }
+  .dl-dock { top: 32%; }
+  .dl-drawer { width: 138px; padding: 6px; }
+  /* No gutter to hide in on a phone, so keep the last few pixels of the text
+     column clear of the tab instead of letting it sit on the words. */
+  .readercol { padding-right: 18px; }
 }
