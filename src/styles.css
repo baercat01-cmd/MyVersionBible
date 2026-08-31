@@ -141,8 +141,30 @@ textarea { width: 100%; min-height: 90px; resize: vertical; line-height: 1.5; }
   padding: 12px; display: flex; flex-direction: column; gap: 8px;
   position: sticky; top: 62px; max-height: calc(100dvh - 150px); overflow-y: auto;
 }
-@media (max-width: 900px) { .notescol { position: static; max-height: none; } }
-.notescol-head { font-size: 0.9rem; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+/*
+ * Under 900px the panel used to stack below the whole chapter, which on a phone
+ * put it thousands of pixels down the page — tapping "Notes" looked like it did
+ * nothing. It now rises over the text as a sheet.
+ */
+@media (max-width: 900px) {
+  .notescol {
+    position: fixed; left: 0; right: 0; bottom: 58px; top: auto;
+    max-height: 58dvh; overflow-y: auto; z-index: 24;
+    border-radius: 12px 12px 0 0; border-bottom: none;
+    box-shadow: 0 -4px 18px rgba(0,0,0,0.22);
+  }
+  .readerwrap.with-panel { grid-template-columns: 1fr; }
+}
+.notescol-head {
+  font-size: 0.9rem; padding-bottom: 6px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  position: sticky; top: 0; background: var(--panel);
+}
+.notescol-close {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  font-size: 1rem; padding: 2px 6px; line-height: 1;
+}
+.notescol-close:hover { color: var(--accent); }
 .notecard {
   text-align: left; background: transparent; color: var(--ink);
   border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
@@ -303,3 +325,6 @@ textarea { width: 100%; min-height: 90px; resize: vertical; line-height: 1.5; }
      column clear of the tab instead of letting it sit on the words. */
   .readercol { padding-right: 18px; }
 }
+
+/* Isolate the ink canvas so a stroke never repaints the text beneath it. */
+.dl-canvas { contain: strict; will-change: contents; }

@@ -61,7 +61,20 @@ const K = {
   color: 'mvb-draw-color',
   width: 'mvb-draw-width',
   finger: 'mvb-draw-finger',
-  drawer: 'mvb-draw-drawer'
+  drawer: 'mvb-draw-drawer',
+  eink: 'mvb-draw-eink'
+}
+
+/**
+ * E-ink panels refresh slowly, so drawing on them feels laggy in a way no web
+ * canvas can fully fix — the browser cannot reach the fast-refresh path the
+ * device's own note app uses. What we can do is stop asking the panel to do
+ * more work than necessary: a smaller backing store, no pressure-driven width
+ * changes, and a coarser sampling step.
+ */
+function looksLikeEink(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return /onyx|boox|eink|e-ink|kobo|remarkable|kindle/i.test(navigator.userAgent)
 }
 
 function readLS(key: string, fallback: string): string {
@@ -101,12 +114,16 @@ export default function DrawLayer({
   /* Drawer open/closed is independent of drawing mode: closing the tools does
      not put the pen down. */
   const [drawerOpen, setDrawerOpen] = useState(() => readLS(K.drawer, '0') === '1')
+  const [eink, setEink] = useState(() => readLS(K.eink, looksLikeEink() ? '1' : '0') === '1')
+  const einkRef = useRef(eink)
+  einkRef.current = eink
 
   useEffect(() => { writeLS(K.tool, tool) }, [tool])
   useEffect(() => { writeLS(K.color, colorId) }, [colorId])
   useEffect(() => { writeLS(K.width, String(widthIdx)) }, [widthIdx])
   useEffect(() => { writeLS(K.finger, allowFinger ? '1' : '0') }, [allowFinger])
   useEffect(() => { writeLS(K.drawer, drawerOpen ? '1' : '0') }, [drawerOpen])
+  useEffect(() => { writeLS(K.eink, eink ? '1' : '0') }, [eink])
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [host, setHost] = useState<HTMLElement | null>(null)
@@ -139,10 +156,28 @@ export default function DrawLayer({
 
   /* ------------------------------ painting ------------------------------ */
 
+  const ctxRef = useRef<CanvasRenderingContext2D | null>(null)
+  const ctxForRef = useRef<HTMLCanvasElement | null>(null)
+
+  /**
+   * The 2D context, created once with `desynchronized: true`.
+   *
+   * That flag is the low-latency ink path: it lets the browser present canvas
+   * updates without waiting for the normal compositing step, which is the
+   * single largest code-side win for stylus lag. It only applies to the first
+   * getContext call for a canvas, so the context is cached rather than fetched
+   * per point.
+   */
   const ctxOf = useCallback(() => {
     const cv = canvasRef.current
-    return cv ? cv.getContext('2d') : null
+    if (!cv) return null
+    if (ctxRef.current && ctxForRef.current === cv) return ctxRef.current
+    ctxRef.current = cv.getContext('2d', { desynchronized: true, alpha: true })
+    ctxForRef.current = cv
+    return ctxRef.current
   }, [])
+
+  const lastStyleRef = useRef('')
 
   const applyStyle = useCallback((
     ctx: CanvasRenderingContext2D, toolKind: StrokeTool, hex: string, widthPx: number
@@ -153,6 +188,8 @@ export default function DrawLayer({
     ctx.lineWidth = Math.max(0.6, widthPx)
     ctx.globalAlpha = toolKind === 'marker' ? MARKER_ALPHA : 1
   }, [])
+
+  const invalidateStyle = useCallback(() => { lastStyleRef.current = '' }, [])
 
   const paintStroke = useCallback((ctx: CanvasRenderingContext2D, s: StrokeRec) => {
     const { w } = sizeRef.current
@@ -166,6 +203,7 @@ export default function DrawLayer({
   }, [applyStyle])
 
   const redraw = useCallback(() => {
+    invalidateStyle()
     const ctx = ctxOf()
     const { w, h } = sizeRef.current
     if (!ctx || !w) return
@@ -184,7 +222,7 @@ export default function DrawLayer({
       ctx.stroke()
       ctx.globalAlpha = 1
     }
-  }, [ctxOf, paintStroke, applyStyle])
+  }, [ctxOf, paintStroke, applyStyle, invalidateStyle])
 
   /** Size the bitmap to the container at device resolution, then repaint. */
   const fit = useCallback(() => {
@@ -194,17 +232,25 @@ export default function DrawLayer({
     const w = el.clientWidth
     const h = Math.max(el.clientHeight, el.scrollHeight)
     if (!w || !h) return
-    const dpr = Math.min(window.devicePixelRatio || 1, 3)
+    // On e-ink there is no benefit to a high-resolution backing store: the
+    // panel is greyscale and slow, and every extra pixel costs refresh time.
+    let dpr = einkRef.current ? 1 : Math.min(window.devicePixelRatio || 1, 2)
+    // Cap the total backing store however tall the chapter is.
+    const MAX_PIXELS = einkRef.current ? 2.5e6 : 6e6
+    while (dpr > 0.5 && w * dpr * h * dpr > MAX_PIXELS) dpr -= 0.25
     const bw = Math.round(w * dpr), bh = Math.round(h * dpr)
     // Assigning width/height clears the bitmap, so only do it when it changed.
     if (cv.width !== bw || cv.height !== bh) { cv.width = bw; cv.height = bh }
     cv.style.width = `${w}px`
     cv.style.height = `${h}px`
-    const ctx = cv.getContext('2d')
+    const ctx = ctxOf()
     if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     sizeRef.current = { w, h, dpr }
     redraw()
-  }, [containerRef, redraw])
+  }, [containerRef, redraw, ctxOf])
+
+  // Switching e-ink mode changes the backing-store scale, so rebuild it.
+  useEffect(() => { fit() }, [eink])
 
   // Attach to the host: guarantee a positioning context, then track its size.
   useLayoutEffect(() => {
@@ -266,15 +312,22 @@ export default function DrawLayer({
       const drawTool: StrokeTool = cfg.current.tool === 'marker' ? 'marker' : 'pen'
       if (pts.length >= 2) {
         const px = pts[pts.length - 2], py = pts[pts.length - 1]
-        // Skip sub-pixel jitter; keeps stored strokes small.
-        if (Math.abs(p.x - px) * w < 0.4 && Math.abs(p.y - py) * w < 0.4) return
-        const factor = drawTool === 'pen' ? pressureFactor(pressure) : 1
-        applyStyle(ctx, drawTool, colorHex(cfg.current.colorId), baseWidthNorm() * factor * w)
+        // Skip sub-pixel jitter; keeps stored strokes small. A coarser step on
+        // e-ink means fewer draw calls per stroke, which the panel notices.
+        const minStep = einkRef.current ? 1.2 : 0.4
+        if (Math.abs(p.x - px) * w < minStep && Math.abs(p.y - py) * w < minStep) return
+        // Varying width by pressure re-styles the context on every segment. On
+        // e-ink the panel cannot show the subtlety anyway, so keep it constant.
+        const factor = drawTool === 'pen' && !einkRef.current ? pressureFactor(pressure) : 1
+        const styleKey = `${drawTool}|${cfg.current.colorId}|${(baseWidthNorm() * factor * w).toFixed(2)}`
+        if (styleKey !== lastStyleRef.current) {
+          applyStyle(ctx, drawTool, colorHex(cfg.current.colorId), baseWidthNorm() * factor * w)
+          lastStyleRef.current = styleKey
+        }
         ctx.beginPath()
         ctx.moveTo(px * w, py * w)
         ctx.lineTo(p.x * w, p.y * w)
         ctx.stroke()
-        ctx.globalAlpha = 1
       }
       pts.push(p.x, p.y)
       if (pressure > 0) { pressSumRef.current += pressure; pressCountRef.current++ }
@@ -480,6 +533,17 @@ export default function DrawLayer({
                   onChange={e => setAllowFinger(e.target.checked)}
                 />
                 Finger
+              </label>
+              <label
+                className="dl-finger small"
+                title="Less work for a slow panel: smaller canvas, no pressure shading"
+              >
+                <input
+                  type="checkbox"
+                  checked={eink}
+                  onChange={e => setEink(e.target.checked)}
+                />
+                E-ink
               </label>
             </div>
           )}

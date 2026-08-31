@@ -145,3 +145,13 @@
 .audio-settings label { display: block; margin-top: 6px; }
 /* The verse being read — a quiet band, not a highlight, so marks stay readable. */
 .verse.speaking { box-shadow: inset 0 -0.85em 0 0 var(--highlight-blue); border-radius: 3px; }
+
+/* Reading streak */
+.streakrow {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 6px 0 10px; border-bottom: 1px solid var(--border); margin-bottom: 8px;
+}
+.streak { display: flex; align-items: baseline; gap: 6px; }
+.streak-flame { font-size: 1.3rem; }
+.streak-n { font-size: 1.6rem; font-weight: 700; color: var(--accent); }
+.streak-label { font-size: 0.85rem; color: var(--muted); }

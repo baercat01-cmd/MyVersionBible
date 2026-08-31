@@ -9,7 +9,10 @@ import type { Segment } from '../data/types'
 import { parsePassages, loadPassages, passagesLabel, type LoadedChapter } from '../lib/passages'
 import { bookName } from '../lib/books'
 import { MARK_COLORS, MARK_STYLES, colorHex } from '../lib/marks'
-import { buildPlan, getCompleted, toggleCompleted, getStartDate, startPlan, resetPlan, dayForDate } from '../lib/plan'
+import {
+  buildPlan, getCompleted, toggleCompleted, getStartDate, startPlan, resetPlan,
+  dayForDate, getReadDates, computeStreak, markSegmentRead, type Streak
+} from '../lib/plan'
 import { paragraphs } from '../lib/storybooks'
 import VerseText from '../components/VerseText'
 import NoteEditor from '../components/NoteEditor'
@@ -104,7 +107,35 @@ export default function ChronoView() {
   const plan = useMemo(() => buildPlan(365), [])
   const [completed, setCompletedState] = useState<Set<string>>(new Set())
   const [planStart, setPlanStart] = useState<string | null>(null)
-  useEffect(() => { getCompleted().then(setCompletedState); getStartDate().then(setPlanStart) }, [])
+  const [streak, setStreak] = useState<Streak>({ current: 0, longest: 0, readToday: false, total: 0 })
+  // Which plan day the reader is working through, so finishing its last
+  // segment can close the day out.
+  const [activeDay, setActiveDay] = useState<number | null>(null)
+
+  useEffect(() => {
+    getCompleted().then(setCompletedState)
+    getStartDate().then(setPlanStart)
+    getReadDates().then(d => setStreak(computeStreak(d)))
+  }, [])
+
+  /** Mark the segment read and count today toward the streak. */
+  async function completeSegment(id: string) {
+    const { done, dates } = await markSegmentRead(id)
+    setCompletedState(new Set(done))
+    setStreak(computeStreak(dates))
+  }
+
+  /** Open a plan day at its first reading. */
+  function openDay(day: number) {
+    const d = plan.find(x => x.day === day)
+    if (!d?.segments.length) return
+    const i = segments.findIndex(x => x.id === d.segments[0].id)
+    if (i < 0) return
+    setActiveDay(day)
+    setIndex(i)
+    setShowPlan(false)
+    window.scrollTo(0, 0)
+  }
 
   const eraOf = ERAS.find(e => e.id === segment?.era)
 
@@ -179,6 +210,18 @@ export default function ChronoView() {
         </div>
         <div className="card">
           <h3>Through the Bible in a year</h3>
+          <div className="streakrow">
+            <div className="streak">
+              <span className="streak-flame">{streak.current > 0 ? '🔥' : '·'}</span>
+              <span className="streak-n">{streak.current}</span>
+              <span className="streak-label">day{streak.current === 1 ? '' : 's'} in a row</span>
+            </div>
+            <div className="meta">
+              {streak.readToday ? 'Read today ✓' : 'Not read yet today'}
+              {streak.longest > streak.current && <> · best {streak.longest}</>}
+              {streak.total > 0 && <> · {streak.total} days read</>}
+            </div>
+          </div>
           <p className="muted small">
             All {CHRONOLOGY.length} segments in chronological order, spread over 365 days by length
             of reading. {planStart
@@ -186,6 +229,11 @@ export default function ChronoView() {
               : <>Not started. You can also just read straight through without dates.</>}
             {' '}{completed.size} of {CHRONOLOGY.length} segments read.
           </p>
+          {today !== null && (
+            <button className="btn" onClick={() => openDay(today)}>
+              Read today&rsquo;s portion (day {today})
+            </button>
+          )}
         </div>
         {plan.map(d => {
           const isToday = today === d.day
@@ -193,8 +241,13 @@ export default function ChronoView() {
           return (
             <div className={`card planday ${isToday ? 'today' : ''} ${allDone ? 'done' : ''}`} key={d.day}>
               <div className="row" style={{ justifyContent: 'space-between' }}>
-                <strong>Day {d.day}{isToday ? ' · today' : ''}</strong>
-                {allDone && <span className="small muted">✓ read</span>}
+                <button className="linklike" onClick={() => openDay(d.day)}>
+                  <strong>Day {d.day}{isToday ? ' · today' : ''}</strong>
+                </button>
+                <span className="row" style={{ gap: 6 }}>
+                  {allDone && <span className="small muted">✓ read</span>}
+                  <button className="btn small" onClick={() => openDay(d.day)}>Open</button>
+                </span>
               </div>
               {d.segments.map(s => (
                 <div className="row planseg" key={s.id}>
@@ -320,11 +373,19 @@ export default function ChronoView() {
               onClick={() => { setIndex(clamped - 1); window.scrollTo(0, 0) }}>← Previous</button>
             <button
               className="btn secondary"
-              onClick={async () => { setCompletedState(await toggleCompleted(segment.id)) }}
+              onClick={async () => {
+                if (completed.has(segment.id)) setCompletedState(await toggleCompleted(segment.id))
+                else await completeSegment(segment.id)
+              }}
               title="Mark this segment read"
             >{completed.has(segment.id) ? '✓ Read' : 'Mark read'}</button>
             <button className="btn secondary" disabled={clamped >= segments.length - 1}
-              onClick={() => { setIndex(clamped + 1); window.scrollTo(0, 0) }}>Next →</button>
+              onClick={async () => {
+                // Moving on means you have read it, so it checks itself off.
+                await completeSegment(segment.id)
+                setIndex(clamped + 1)
+                window.scrollTo(0, 0)
+              }}>Next →</button>
           </div>
         </div>
       )}
