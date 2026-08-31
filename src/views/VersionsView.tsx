@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import {
@@ -6,10 +6,18 @@ import {
   storeTranslation, type CatalogLanguage
 } from '../lib/bolls'
 
+const ALL = '__all__'
+
+// bolls labels languages with their own names; match English tolerantly.
+function isEnglish(language: string): boolean {
+  return language.trim().toLowerCase().startsWith('english')
+}
+
 export default function VersionsView() {
   const downloaded = useLiveQuery(() => db.translations.toArray(), []) || []
   const [catalog, setCatalog] = useState<CatalogLanguage[] | null>(null)
   const [catalogError, setCatalogError] = useState('')
+  const [language, setLanguage] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [progress, setProgress] = useState('')
@@ -20,12 +28,43 @@ export default function VersionsView() {
     fetchCatalog().then(setCatalog).catch(e => setCatalogError(String(e)))
   }, [])
 
+  // Known-good English (plus original-language) entries always come first, so the
+  // essentials stay reachable no matter how the live catalog labels its languages.
+  const catalogEntries = useMemo(() => {
+    const entries = [...FEATURED]
+    const seen = new Set(FEATURED.map(t => t.id))
+    for (const l of catalog || []) {
+      for (const t of l.translations) {
+        if (seen.has(t.short_name)) continue
+        seen.add(t.short_name)
+        entries.push({ id: t.short_name, name: t.full_name, language: l.language })
+      }
+    }
+    return entries
+  }, [catalog])
+
+  // Languages present in the catalog, English first, then alphabetical.
+  const languages = useMemo(() => {
+    const set = [...new Set(catalogEntries.map(e => e.language))]
+    return set.sort((a, b) => {
+      if (isEnglish(a) !== isEnglish(b)) return isEnglish(a) ? -1 : 1
+      return a.localeCompare(b)
+    })
+  }, [catalogEntries])
+
+  // Default to English once we know what the catalog calls it.
+  useEffect(() => {
+    if (language === null && languages.length) {
+      setLanguage(languages.find(isEnglish) ?? languages[0])
+    }
+  }, [languages, language])
+
   const downloadedIds = new Set(downloaded.map(t => t.id))
 
-  async function handleDownload(id: string, name: string, language: string) {
+  async function handleDownload(id: string, name: string, lang: string) {
     setBusy(id); setError(''); setProgress('')
     try {
-      await downloadTranslation(id, name, language, setProgress)
+      await downloadTranslation(id, name, lang, setProgress)
     } catch (e) {
       setError(`Could not download ${id}: ${e instanceof Error ? e.message : e}`)
     } finally {
@@ -48,16 +87,12 @@ export default function VersionsView() {
     }
   }
 
-  // Flatten live catalog for search; fall back to the featured list.
-  const catalogEntries = catalog
-    ? catalog.flatMap(l => l.translations.map(t => ({ id: t.short_name, name: t.full_name, language: l.language })))
-    : FEATURED
-
   const q = search.trim().toLowerCase()
-  const filtered = catalogEntries
+  const available = catalogEntries
     .filter(t => !downloadedIds.has(t.id))
-    .filter(t => !q || t.id.toLowerCase().includes(q) || t.name.toLowerCase().includes(q) || t.language.toLowerCase().includes(q))
-    .slice(0, q ? 60 : 25)
+    .filter(t => language === ALL || language === null || t.language === language)
+    .filter(t => !q || t.id.toLowerCase().includes(q) || t.name.toLowerCase().includes(q))
+    .sort((a, b) => a.id.localeCompare(b.id))
 
   return (
     <div className="stack">
@@ -80,29 +115,49 @@ export default function VersionsView() {
       <div className="card">
         <h3>Get more versions</h3>
         <p className="muted small">
-          Public-domain translations from bolls.life. {catalogError && !catalog ? 'Live catalog unavailable — showing featured list.' : ''}
+          Public-domain translations from bolls.life.
+          {!catalog && catalogError && ' Live catalog unavailable — showing the featured list.'}
         </p>
+
+        <div className="row" style={{ marginBottom: 8 }}>
+          <label className="small muted" htmlFor="langsel">Language:</label>
+          <select
+            id="langsel"
+            value={language ?? ''}
+            onChange={e => setLanguage(e.target.value)}
+          >
+            {languages.map(l => <option key={l} value={l}>{l}</option>)}
+            <option value={ALL}>All languages ({catalogEntries.length})</option>
+          </select>
+        </div>
+
         <input
           type="text"
-          placeholder="Search by name or language…"
+          placeholder="Search by name or abbreviation…"
           value={search}
           onChange={e => setSearch(e.target.value)}
           style={{ width: '100%', marginBottom: 8 }}
         />
+
         {error && <p className="small" style={{ color: '#b3402a' }}>{error}</p>}
         {busy && <p className="progress">{busy === 'file' ? 'Importing…' : `Downloading ${busy}…`} {progress}</p>}
-        {filtered.map(t => (
-          <div className="row" key={t.id} style={{ justifyContent: 'space-between', padding: '6px 0' }}>
+
+        {available.map(t => (
+          <div className="row" key={`${t.language}:${t.id}`} style={{ justifyContent: 'space-between', padding: '6px 0' }}>
             <div>
               <strong>{t.id}</strong> — {t.name}
-              <div className="meta">{t.language}</div>
+              {language === ALL && <div className="meta">{t.language}</div>}
             </div>
             <button className="btn small" disabled={busy !== null} onClick={() => handleDownload(t.id, t.name, t.language)}>
               Download
             </button>
           </div>
         ))}
-        {filtered.length === 0 && <p className="muted small">No matches.</p>}
+        {available.length === 0 && (
+          <p className="muted small">
+            {q ? 'No matches — try clearing the search.' : 'Everything in this language is already downloaded.'}
+          </p>
+        )}
       </div>
 
       <div className="card">
