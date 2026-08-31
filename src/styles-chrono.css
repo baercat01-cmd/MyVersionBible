@@ -48,3 +48,26 @@
   margin: 0 0 1em; text-indent: 1.4em;
 }
 .story-para:first-of-type { text-indent: 0; }
+
+/* Search */
+.searchopt { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.hitcard {
+  display: block; width: 100%; text-align: left; cursor: pointer;
+  background: var(--panel); color: var(--ink);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 9px 12px; margin-bottom: 6px; font-family: var(--sans);
+}
+.hitcard:hover { border-color: var(--accent); }
+.hitref { color: var(--accent); font-weight: 700; font-size: 0.8rem; margin-bottom: 2px; }
+.hittext { font-family: var(--serif); font-size: 1rem; line-height: 1.55; }
+.hittext mark {
+  background: var(--highlight-yellow); color: inherit;
+  border-radius: 3px; padding: 0 1px; font-weight: 600;
+}
+
+/* The jumped-to verse, briefly, so the eye lands on it. */
+.verse.flash { animation: verseflash 2.2s ease-out 1; border-radius: 4px; }
+@keyframes verseflash {
+  0%, 45% { background: var(--highlight-yellow); }
+  100% { background: transparent; }
+}

@@ -10,6 +10,7 @@ import NoteEditor from '../components/NoteEditor'
 import NotesPanel from '../components/NotesPanel'
 import VerseText from '../components/VerseText'
 import DrawLayer from '../components/DrawLayer'
+import { onJump, takeJump } from '../lib/nav'
 
 interface Position { translation: string; book: number; chapter: number; parallel: string }
 
@@ -33,6 +34,7 @@ export default function ReaderView() {
   const [showPanel, setShowPanel] = useState(() => localStorage.getItem(PANEL_KEY) !== '0')
   // The drawing canvas overlays this column, so strokes sit over the text.
   const readerCol = useRef<HTMLDivElement>(null)
+  const [flashVerse, setFlashVerse] = useState<number | null>(null)
 
   const translations = useLiveQuery(() => db.translations.toArray(), []) || []
 
@@ -47,6 +49,24 @@ export default function ReaderView() {
   useEffect(() => { localStorage.setItem(PANEL_KEY, showPanel ? '1' : '0') }, [showPanel])
   useEffect(() => { setSel(null) }, [pos.translation, pos.book, pos.chapter])
 
+  // Open at a passage requested elsewhere (a search result, say).
+  useEffect(() => {
+    const apply = () => {
+      const t = takeJump()
+      if (!t) return
+      setPos(p => ({
+        ...p,
+        translation: t.translation || p.translation,
+        book: t.book,
+        chapter: t.chapter
+      }))
+      setFlashVerse(t.verse ?? null)
+    }
+    apply()
+    return onJump(apply)
+  }, [])
+
+
   const current = translations.find(t => t.id === pos.translation)
   const bookMeta = current?.books.find(b => b.bookid === pos.book)
 
@@ -58,6 +78,14 @@ export default function ReaderView() {
     () => pos.parallel ? getChapter(pos.parallel, pos.book, pos.chapter) : undefined,
     [pos.parallel, pos.book, pos.chapter]
   )
+  // Scroll to the jumped-to verse once its chapter has rendered.
+  useEffect(() => {
+    if (flashVerse === null || !chapterRec) return
+    const el = document.querySelector(`[data-verse="${pos.book}-${pos.chapter}-${flashVerse}"]`)
+    el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    const timer = setTimeout(() => setFlashVerse(null), 2400)
+    return () => clearTimeout(timer)
+  }, [flashVerse, chapterRec, pos.book, pos.chapter])
 
   // Everything anchored in this chapter — marks and notes alike. Live, so a new
   // mark or note appears immediately and is still here on the next visit.
@@ -175,6 +203,7 @@ export default function ReaderView() {
                   key={v} verse={v} text={t} marks={marks}
                   book={pos.book} chapter={pos.chapter}
                   sel={sel ? { book: pos.book, chapter: pos.chapter, ...sel } : null}
+                  flash={flashVerse === v}
                   onWord={selectWord} onVerse={selectVerse}
                 />
               ))}

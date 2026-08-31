@@ -65,10 +65,15 @@ body {
 .tabbar button {
   background: none; border: none; color: var(--muted);
   font-size: 0.72rem; padding: 6px 10px; cursor: pointer;
+  min-width: 0; flex: 1 1 0;
   display: flex; flex-direction: column; align-items: center; gap: 2px;
   font-family: var(--sans);
 }
 .tabbar button .icon { font-size: 1.25rem; line-height: 1; }
+@media (max-width: 430px) {
+  .tabbar button { padding: 6px 2px; font-size: 0.63rem; }
+  .tabbar button .icon { font-size: 1.1rem; }
+}
 .tabbar button.active { color: var(--accent); font-weight: 600; }
 
 button.btn {
