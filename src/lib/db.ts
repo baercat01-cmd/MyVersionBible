@@ -288,6 +288,39 @@ export async function deleteNote(id: string) {
   await db.notes.put({ ...existing, deleted: 1, dirty: 1, updated_at: nowISO() })
 }
 
+/**
+ * Mark a range that may cover part of a verse, a phrase crossing verses, whole
+ * verses, or a chapter. One record is stored per verse — each carrying its own
+ * word list, or null for the whole verse — so rendering and erasing stay a
+ * simple per-verse lookup.
+ */
+export async function saveMarkRange(
+  book: number,
+  chapter: number,
+  translation: string,
+  perVerse: { verse: number; words: number[] | null }[],
+  style: MarkStyle,
+  color: string
+): Promise<void> {
+  for (const { verse, words } of perVerse) {
+    if (words && words.length === 0) continue
+    await saveMark({ book, chapter, v1: verse, v2: verse, translation }, style, color, words)
+  }
+}
+
+/** Erase marks across every verse of a range. */
+export async function eraseRange(
+  book: number,
+  chapter: number,
+  perVerse: { verse: number; words: number[] | null }[]
+): Promise<number> {
+  let removed = 0
+  for (const { verse, words } of perVerse) {
+    removed += await eraseMarks(book, chapter, verse, words)
+  }
+  return removed
+}
+
 /** Add a mark over a whole verse range, or over specific words of one verse. */
 export async function saveMark(
   ref: VerseRef,

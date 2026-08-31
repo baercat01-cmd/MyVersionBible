@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
-  db, getChapter, notesInChapter, saveMark, eraseMarks,
+  db, getChapter, notesInChapter, saveMarkRange, eraseRange,
   type MarkStyle, type NoteRec, type VerseRef
 } from '../lib/db'
+import { useSelection } from '../lib/useSelection'
+import { ordered, verseRange } from '../lib/selection'
 import { bookName } from '../lib/books'
 import { MARK_COLORS, MARK_STYLES, colorHex } from '../lib/marks'
 import NoteEditor from '../components/NoteEditor'
@@ -32,14 +34,17 @@ function loadPos(): Position {
 
 export default function ReaderView() {
   const [pos, setPos] = useState<Position>(loadPos)
-  const [sel, setSel] = useState<{ verse: number; words: number[] } | null>(null)
-  const [editing, setEditing] = useState<NoteRec | 'new' | null>(null)
+  const [editing, setEditing] = useState<NoteRec | 'new' | 'study' | null>(null)
   const [color, setColor] = useState(() => localStorage.getItem(COLOR_KEY) || 'yellow')
   const [showPanel, setShowPanel] = useState(() => localStorage.getItem(PANEL_KEY) !== '0')
   // The drawing canvas overlays this column, so strokes sit over the text.
   const readerCol = useRef<HTMLDivElement>(null)
   const [flashVerse, setFlashVerse] = useState<number | null>(null)
   const [collecting, setCollecting] = useState(false)
+  const {
+    sel, clear, onWord, onVerse, onDragOver, expandVerses, selectChapter,
+    selectionRef: selRef, perVerse, measure, label, isSingleWord
+  } = useSelection()
 
   const translations = useLiveQuery(() => db.translations.toArray(), []) || []
 
@@ -52,7 +57,7 @@ export default function ReaderView() {
   useEffect(() => { localStorage.setItem(POS_KEY, JSON.stringify(pos)) }, [pos])
   useEffect(() => { localStorage.setItem(COLOR_KEY, color) }, [color])
   useEffect(() => { localStorage.setItem(PANEL_KEY, showPanel ? '1' : '0') }, [showPanel])
-  useEffect(() => { setSel(null) }, [pos.translation, pos.book, pos.chapter])
+  useEffect(() => { clear() }, [pos.translation, pos.book, pos.chapter])
 
   // Open at a passage requested elsewhere (a search result, say).
   useEffect(() => {
@@ -106,48 +111,44 @@ export default function ReaderView() {
     [anchored]
   )
 
-  // Strong's codes on the word currently selected, if the version carries them.
+  // Strong's codes for a single selected word, if the version carries them.
   const selectedCodes = useMemo(() => {
-    if (!sel || sel.words.length !== 1 || !chapterRec) return []
-    const v = chapterRec.verses.find(x => x.v === sel.verse)
-    return v?.s?.[String(sel.words[0])] || []
-  }, [sel, chapterRec])
+    if (!sel || !isSingleWord || !chapterRec) return []
+    const { start } = ordered(sel)
+    const v = chapterRec.verses.find(x => x.v === start.verse)
+    return v?.s?.[String(start.word)] || []
+  }, [sel, isSingleWord, chapterRec])
+
+  // Cross references are shown for every verse the selection touches.
+  const selectedVerses = useMemo(() => (sel ? verseRange(sel) : []), [sel])
 
   function verseOf(n: NoteRec): number {
     const r = n.refs.find(x => x.book === pos.book && x.chapter === pos.chapter)
     return r ? r.v1 : 0
   }
 
-  function selectWord(_book: number, _chapter: number, verse: number, wordIndex: number) {
-    setSel(prev => {
-      if (!prev || prev.verse !== verse) return { verse, words: [wordIndex] }
-      if (!prev.words.length) return { verse, words: [wordIndex] }   // was whole-verse
-      const words = prev.words.includes(wordIndex)
-        ? prev.words.filter(w => w !== wordIndex)
-        : [...prev.words, wordIndex].sort((a, b) => a - b)
-      return words.length ? { verse, words } : null
-    })
-  }
-
-  function selectVerse(_book: number, _chapter: number, verse: number) {
-    setSel(prev => (prev && prev.verse === verse && !prev.words.length) ? null : { verse, words: [] })
-  }
-
   function selectionRef(): VerseRef {
-    const v = sel?.verse ?? 1
-    return { book: pos.book, chapter: pos.chapter, v1: v, v2: v, translation: pos.translation }
+    return selRef(pos.translation) ?? {
+      book: pos.book, chapter: pos.chapter, v1: 1, v2: 1, translation: pos.translation
+    }
   }
 
   async function applyMark(style: MarkStyle) {
     if (!sel) return
-    await saveMark(selectionRef(), style, color, sel.words.length ? sel.words : null)
-    setSel(null)
+    await saveMarkRange(pos.book, pos.chapter, pos.translation, perVerse(), style, color)
+    clear()
   }
 
   async function erase() {
     if (!sel) return
-    await eraseMarks(pos.book, pos.chapter, sel.verse, sel.words)
-    setSel(null)
+    await eraseRange(pos.book, pos.chapter, perVerse())
+    clear()
+  }
+
+  function selectWholeChapter() {
+    const verses = chapterRec?.verses
+    if (!verses?.length) return
+    selectChapter(pos.book, pos.chapter, verses[0].v, verses[verses.length - 1].v)
   }
 
   function goChapter(delta: number) {
@@ -214,9 +215,10 @@ export default function ReaderView() {
                 <VerseText
                   key={v} verse={v} text={t} marks={marks}
                   book={pos.book} chapter={pos.chapter}
-                  sel={sel ? { book: pos.book, chapter: pos.chapter, ...sel } : null}
+                  sel={sel}
                   flash={flashVerse === v}
-                  onWord={selectWord} onVerse={selectVerse}
+                  onWord={onWord} onVerse={onVerse}
+                  onDragOver={onDragOver} onMeasure={measure}
                 />
               ))}
             </div>
@@ -257,21 +259,25 @@ export default function ReaderView() {
             {selectedCodes.length > 0 && (
               <StrongsInfo codes={selectedCodes} translation={pos.translation} />
             )}
-            {sel && (
+            {selectedVerses.slice(0, 5).map(v => (
               <CrossRefs
-                book={pos.book} chapter={pos.chapter} verse={sel.verse}
+                key={v} book={pos.book} chapter={pos.chapter} verse={v}
                 translation={pos.translation}
               />
-            )}
+            ))}
           </NotesPanel>
         )}
       </div>
 
       {sel && !editing && (
         <div className="actionbar no-print">
-          <span className="small muted" style={{ minWidth: 54 }}>
-            v{sel.verse}{sel.words.length ? ` · ${sel.words.length}w` : ''}
-          </span>
+          <span className="small muted" style={{ minWidth: 54 }}>{label}</span>
+          <button className="btn secondary small" onClick={expandVerses} title="Widen to whole verses">
+            ⇱ Verse
+          </button>
+          <button className="btn secondary small" onClick={selectWholeChapter} title="Select the whole chapter">
+            ⇱ Chapter
+          </button>
           <div className="row" style={{ gap: 4 }}>
             {MARK_COLORS.map(c => (
               <button
@@ -302,22 +308,23 @@ export default function ReaderView() {
           >⇄ Refs</button>
           <button className="btn secondary small" onClick={erase} title="Erase marks here">Erase</button>
           <button className="btn small" onClick={() => setEditing('new')}>+ Note</button>
+          <button className="btn small" onClick={() => setEditing('study')}>+ Study</button>
           <button className="btn small" onClick={() => setCollecting(true)}>+ List</button>
-          <button className="btn secondary small" onClick={() => setSel(null)} aria-label="Close">✕</button>
+          <button className="btn secondary small" onClick={clear} aria-label="Close">✕</button>
         </div>
       )}
 
       {collecting && sel && (
-        <AddToCollection verseRef={selectionRef()} onDone={() => { setCollecting(false); setSel(null) }} />
+        <AddToCollection verseRef={selectionRef()} onDone={() => { setCollecting(false); clear() }} />
       )}
 
       {editing && (
         <div className="editor-overlay">
           <NoteEditor
-            note={editing === 'new' ? undefined : editing}
-            kind={editing === 'new' ? 'verse' : editing.kind}
-            refs={editing === 'new' && sel ? [selectionRef()] : undefined}
-            onDone={() => { setEditing(null); setSel(null) }}
+            note={typeof editing === 'string' ? undefined : editing}
+            kind={editing === 'study' ? 'study' : editing === 'new' ? 'verse' : editing.kind}
+            refs={typeof editing === 'string' && sel ? [selectionRef()] : undefined}
+            onDone={() => { setEditing(null); clear() }}
           />
         </div>
       )}

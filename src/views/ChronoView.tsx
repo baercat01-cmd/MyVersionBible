@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, notesInChapter, saveMark, eraseMarks, type MarkStyle, type NoteRec, type VerseRef } from '../lib/db'
+import { db, notesInChapter, saveMarkRange, eraseRange, type MarkStyle, type NoteRec, type VerseRef } from '../lib/db'
+import { useSelection } from '../lib/useSelection'
+import { verseRange } from '../lib/selection'
 import { CHRONOLOGY, ERAS } from '../data/chronology'
 import { HARMONY } from '../data/harmony'
 import type { Segment } from '../data/types'
@@ -9,7 +11,7 @@ import { bookName } from '../lib/books'
 import { MARK_COLORS, MARK_STYLES, colorHex } from '../lib/marks'
 import { buildPlan, getCompleted, toggleCompleted, getStartDate, startPlan, resetPlan, dayForDate } from '../lib/plan'
 import { paragraphs } from '../lib/storybooks'
-import VerseText, { type Selection } from '../components/VerseText'
+import VerseText from '../components/VerseText'
 import NoteEditor from '../components/NoteEditor'
 import ContextPanel from '../components/ContextPanel'
 
@@ -27,8 +29,11 @@ export default function ChronoView() {
   const [index, setIndex] = useState(() => +(localStorage.getItem(IDX_KEY) || 0))
   const [story, setStory] = useState(() => localStorage.getItem(STORY_KEY) === '1')
   const [color, setColor] = useState(() => localStorage.getItem(COLOR_KEY) || 'yellow')
-  const [sel, setSel] = useState<Selection | null>(null)
-  const [editing, setEditing] = useState<NoteRec | 'new' | null>(null)
+  const [editing, setEditing] = useState<NoteRec | 'new' | 'study' | null>(null)
+  const {
+    sel, clear, onWord, onVerse, onDragOver, expandVerses, selectChapter,
+    selectionRef: selRef, perVerse, measure, label
+  } = useSelection()
   const [loaded, setLoaded] = useState<LoadedChapter[] | null>(null)
   const [showPlan, setShowPlan] = useState(false)
 
@@ -55,7 +60,7 @@ export default function ChronoView() {
   useEffect(() => { localStorage.setItem(ORDER_KEY, order) }, [order])
   useEffect(() => { localStorage.setItem(STORY_KEY, story ? '1' : '0') }, [story])
   useEffect(() => { localStorage.setItem(COLOR_KEY, color) }, [color])
-  useEffect(() => { setSel(null) }, [clamped, order, translation])
+  useEffect(() => { clear() }, [clamped, order, translation])
 
   // Nothing to apply an order to: go straight to the retelling.
   useEffect(() => {
@@ -100,43 +105,28 @@ export default function ChronoView() {
 
   const eraOf = ERAS.find(e => e.id === segment?.era)
 
-  // A segment can span several chapters, so every selection carries its own
-  // book and chapter rather than relying on a verse number alone.
-  function selectWord(book: number, chapter: number, verse: number, wordIndex: number) {
-    setSel(prev => {
-      const same = prev && prev.book === book && prev.chapter === chapter && prev.verse === verse
-      if (!same || !prev!.words.length) return { book, chapter, verse, words: [wordIndex] }
-      const words = prev!.words.includes(wordIndex)
-        ? prev!.words.filter(w => w !== wordIndex)
-        : [...prev!.words, wordIndex].sort((a, b) => a - b)
-      return words.length ? { book, chapter, verse, words } : null
-    })
-  }
-
-  function selectVerse(book: number, chapter: number, verse: number) {
-    setSel(prev => (prev && prev.book === book && prev.chapter === chapter
-      && prev.verse === verse && !prev.words.length)
-      ? null
-      : { book, chapter, verse, words: [] })
-  }
-
   function selectionRef(): VerseRef {
-    return {
-      book: sel!.book, chapter: sel!.chapter,
-      v1: sel!.verse, v2: sel!.verse, translation
-    }
+    return selRef(translation) ?? { book: 1, chapter: 1, v1: 1, v2: 1, translation }
   }
 
   async function applyMark(style: MarkStyle) {
     if (!sel) return
-    await saveMark(selectionRef(), style, color, sel.words.length ? sel.words : null)
-    setSel(null)
+    await saveMarkRange(sel.book, sel.chapter, translation, perVerse(), style, color)
+    clear()
   }
 
   async function erase() {
     if (!sel) return
-    await eraseMarks(sel.book, sel.chapter, sel.verse, sel.words)
-    setSel(null)
+    await eraseRange(sel.book, sel.chapter, perVerse())
+    clear()
+  }
+
+  /** Select every verse of the chapter the selection sits in. */
+  function selectWholeChapter() {
+    const ch = (loaded || []).find(c => c.book === sel?.book && c.chapter === sel?.chapter)
+      || (loaded || [])[0]
+    if (!ch?.verses.length) return
+    selectChapter(ch.book, ch.chapter, ch.verses[0].v, ch.verses[ch.verses.length - 1].v)
   }
 
   // A retelling needs no translation, so only block when there is nothing to read.
@@ -291,7 +281,8 @@ export default function ChronoView() {
                     key={v} verse={v} text={t} marks={marks}
                     book={ch.book} chapter={ch.chapter}
                     sel={sel} story={story}
-                    onWord={selectWord} onVerse={selectVerse}
+                    onWord={onWord} onVerse={onVerse}
+                    onDragOver={onDragOver} onMeasure={measure}
                   />
                 ))}
               </div>
@@ -314,9 +305,9 @@ export default function ChronoView() {
 
       {sel && !editing && (
         <div className="actionbar no-print">
-          <span className="small muted" style={{ minWidth: 54 }}>
-            v{sel.verse}{sel.words.length ? ` · ${sel.words.length}w` : ''}
-          </span>
+          <span className="small muted" style={{ minWidth: 54 }}>{label}</span>
+          <button className="btn secondary small" onClick={expandVerses} title="Widen to whole verses">⇱ Verse</button>
+          <button className="btn secondary small" onClick={selectWholeChapter} title="Select the whole chapter">⇱ Chapter</button>
           <div className="row" style={{ gap: 4 }}>
             {MARK_COLORS.map(c => (
               <button key={c.id} className={`swatch ${color === c.id ? 'active' : ''}`}
@@ -332,17 +323,18 @@ export default function ChronoView() {
           </div>
           <button className="btn secondary small" onClick={erase}>Erase</button>
           <button className="btn small" onClick={() => setEditing('new')}>+ Note</button>
-          <button className="btn secondary small" onClick={() => setSel(null)} aria-label="Close">✕</button>
+          <button className="btn small" onClick={() => setEditing('study')}>+ Study</button>
+          <button className="btn secondary small" onClick={clear} aria-label="Close">✕</button>
         </div>
       )}
 
       {editing && (
         <div className="editor-overlay">
           <NoteEditor
-            note={editing === 'new' ? undefined : editing}
-            kind={editing === 'new' ? 'verse' : editing.kind}
-            refs={editing === 'new' && sel ? [selectionRef()] : undefined}
-            onDone={() => { setEditing(null); setSel(null) }}
+            note={typeof editing === 'string' ? undefined : editing}
+            kind={editing === 'study' ? 'study' : editing === 'new' ? 'verse' : editing.kind}
+            refs={typeof editing === 'string' && sel ? [selectionRef()] : undefined}
+            onDone={() => { setEditing(null); clear() }}
           />
         </div>
       )}
