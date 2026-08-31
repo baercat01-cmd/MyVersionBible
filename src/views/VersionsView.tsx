@@ -7,6 +7,7 @@ import {
 } from '../lib/bolls'
 import StoryBookImport from '../components/StoryBookImport'
 import StudyDataImport from '../components/StudyDataImport'
+import VersionInfoCard from '../components/VersionInfoCard'
 
 const ALL = '__all__'
 
@@ -104,12 +105,15 @@ export default function VersionsView() {
           <p className="muted small">Nothing downloaded yet. Grab a version below — after that it works fully offline.</p>
         )}
         {downloaded.map(t => (
-          <div className="row" key={t.id} style={{ justifyContent: 'space-between', padding: '6px 0' }}>
-            <div>
-              <strong>{t.id}</strong> — {t.name}
-              <div className="meta">{t.language} · {t.verseCount.toLocaleString()} verses</div>
+          <div className="verrow" key={t.id}>
+            <div className="row" style={{ justifyContent: 'space-between' }}>
+              <div>
+                <strong>{t.id}</strong> — {t.name}
+                <div className="meta">{t.language} · {t.verseCount.toLocaleString()} verses</div>
+              </div>
+              <button className="btn secondary small" onClick={() => removeTranslation(t.id)}>Remove</button>
             </div>
-            <button className="btn secondary small" onClick={() => removeTranslation(t.id)}>Remove</button>
+            <VersionInfoCard id={t.id} fullName={t.name} />
           </div>
         ))}
       </div>
@@ -145,14 +149,17 @@ export default function VersionsView() {
         {busy && <p className="progress">{busy === 'file' ? 'Importing…' : `Downloading ${busy}…`} {progress}</p>}
 
         {available.map(t => (
-          <div className="row" key={`${t.language}:${t.id}`} style={{ justifyContent: 'space-between', padding: '6px 0' }}>
-            <div>
-              <strong>{t.id}</strong> — {t.name}
-              {language === ALL && <div className="meta">{t.language}</div>}
+          <div className="verrow" key={`${t.language}:${t.id}`}>
+            <div className="row" style={{ justifyContent: 'space-between' }}>
+              <div>
+                <strong>{t.id}</strong> — {t.name}
+                {language === ALL && <div className="meta">{t.language}</div>}
+              </div>
+              <button className="btn small" disabled={busy !== null} onClick={() => handleDownload(t.id, t.name, t.language)}>
+                Download
+              </button>
             </div>
-            <button className="btn small" disabled={busy !== null} onClick={() => handleDownload(t.id, t.name, t.language)}>
-              Download
-            </button>
+            <VersionInfoCard id={t.id} fullName={t.name} />
           </div>
         ))}
         {available.length === 0 && (

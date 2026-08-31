@@ -54,7 +54,9 @@ await page.waitForSelector('.collect-pop', { state: 'detached' })
 ok('a verse can be added to a new list from the reader')
 
 await tab('Lists').click()
-await page.waitForSelector('.card')
+// The header card renders before the live query resolves, so wait for the
+// collection itself rather than for any card.
+await page.waitForSelector('text=/The Word/', { timeout: 10000 })
 const listText = await page.locator('.stack').innerText()
 if (!/The Word/.test(listText) || !/1 verse/.test(listText)) fail('collection not listed: ' + listText)
 else ok('the collection shows with its verse count')

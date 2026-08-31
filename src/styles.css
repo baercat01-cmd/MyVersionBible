@@ -126,9 +126,13 @@ textarea { width: 100%; min-height: 90px; resize: vertical; line-height: 1.5; }
   vertical-align: super; margin-right: 3px; font-family: var(--sans);
   cursor: pointer; padding: 0 2px;
 }
-.verse.selected { outline: 2px solid var(--accent); outline-offset: 2px; }
 .word { cursor: pointer; padding: 0 0.5px; }
-.word.wsel { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 3px; }
+/* Selected words read as a continuous run, so a phrase looks like one thing. */
+.word.wsel {
+  background: var(--accent); color: var(--accent-ink);
+  border-radius: 2px; box-shadow: 0 0 0 2px var(--accent);
+}
+.reader { -webkit-user-select: none; user-select: none; }
 .rtl { direction: rtl; }
 
 /* Notes beside the text */

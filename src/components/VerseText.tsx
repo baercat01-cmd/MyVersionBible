@@ -1,9 +1,9 @@
-import { Fragment, useMemo } from 'react'
+import { Fragment, useEffect, useMemo } from 'react'
 import type { NoteRec } from '../lib/db'
 import { tokenize, marksForVerse, markStyle } from '../lib/marks'
+import { isWordSelected, type Selection } from '../lib/selection'
 
-/** A verse selection: one verse, either whole (words empty) or specific words. */
-export interface Selection { book: number; chapter: number; verse: number; words: number[] }
+export type { Selection }
 
 interface Props {
   book: number
@@ -18,6 +18,10 @@ interface Props {
   flash?: boolean
   onWord: (book: number, chapter: number, verse: number, i: number) => void
   onVerse: (book: number, chapter: number, verse: number) => void
+  /** Pointer dragged across a word — extends the range without starting a new one. */
+  onDragOver?: (book: number, chapter: number, verse: number, i: number) => void
+  /** Report the word count so the toolbar can tell a full verse from a phrase. */
+  onMeasure?: (verse: number, wordCount: number) => void
 }
 
 /**
@@ -25,19 +29,18 @@ interface Props {
  * reader and the chronological reader so marking behaves identically in both.
  */
 export default function VerseText({
-  book, chapter, verse, text, marks, sel, story, flash, onWord, onVerse
+  book, chapter, verse, text, marks, sel, story, flash, onWord, onVerse, onDragOver, onMeasure
 }: Props) {
   const words = useMemo(() => tokenize(text), [text])
   const applied = useMemo(
     () => marksForVerse(marks, book, chapter, verse, words.length),
     [marks, book, chapter, verse, words.length]
   )
-  const here = sel && sel.book === book && sel.chapter === chapter && sel.verse === verse
-  const verseSelected = !!here && !sel!.words.length
+  useEffect(() => { onMeasure?.(verse, words.length) }, [verse, words.length])
 
   return (
     <span
-      className={`verse ${verseSelected ? 'selected' : ''} ${flash ? 'flash' : ''}`}
+      className={`verse ${flash ? 'flash' : ''}`}
       data-verse={`${book}-${chapter}-${verse}`}
     >
       {!story && (
@@ -51,7 +54,7 @@ export default function VerseText({
         <span className="vhandle" onClick={() => onVerse(book, chapter, verse)} title={`Verse ${verse}`} />
       )}
       {words.map((w, i) => {
-        const wordSelected = !!here && sel!.words.includes(i)
+        const wordSelected = isWordSelected(sel, book, chapter, verse, i)
         return (
           <Fragment key={i}>
             {i > 0 && ' '}
@@ -59,6 +62,7 @@ export default function VerseText({
               className={`word ${wordSelected ? 'wsel' : ''}`}
               style={markStyle(applied.get(i))}
               onClick={() => onWord(book, chapter, verse, i)}
+              onPointerEnter={e => { if (e.buttons === 1) onDragOver?.(book, chapter, verse, i) }}
             >{w}</span>
           </Fragment>
         )
