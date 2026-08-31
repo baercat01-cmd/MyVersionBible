@@ -127,3 +127,10 @@
 .verrow:last-child { border-bottom: none; }
 .verinfo { margin-top: 4px; }
 .verinfo-summary { font-size: 0.8rem; }
+
+/* Connections between your own notes */
+.threadrow { align-items: baseline; padding: 3px 0; gap: 8px; }
+.threadword {
+  display: inline-block; border: 1px solid var(--border); border-radius: 999px;
+  padding: 2px 10px; font-size: 0.78rem; color: var(--accent);
+}
