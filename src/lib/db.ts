@@ -20,7 +20,12 @@ export interface ChapterRec {
   translation: string
   book: number
   chapter: number
-  verses: { v: number; t: string }[]
+  verses: {
+    v: number
+    t: string
+    /** word index -> Strong's codes, present only for tagged translations. */
+    s?: Record<string, string[]>
+  }[]
 }
 
 export interface VerseRef {
@@ -64,6 +69,16 @@ export interface MetaRec { key: string; value: string }
 export interface XrefRec {
   key: string
   targets: string[]     // compact references, parsed by lib/passages.ts
+}
+
+/** One Strong's dictionary entry, keyed by its code (e.g. "H430"). */
+export interface LexRec {
+  code: string
+  lemma: string
+  translit: string
+  pronounce?: string
+  definition: string
+  kjvUsage?: string
 }
 
 /**
@@ -117,6 +132,7 @@ class MVBDatabase extends Dexie {
   strokes!: Table<StrokeRec, string>
   storybooks!: Table<StoryBookRec, string>
   xrefs!: Table<XrefRec, string>
+  lexicon!: Table<LexRec, string>
   meta!: Table<MetaRec, string>
 
   constructor() {
@@ -166,6 +182,16 @@ class MVBDatabase extends Dexie {
       strokes: 'id, pageKey, updated_at, dirty, deleted',
       storybooks: 'id',
       xrefs: 'key',
+      meta: 'key'
+    })
+    this.version(6).stores({
+      translations: 'id',
+      chapters: 'key, translation, [translation+book]',
+      notes: 'id, kind, updated_at, dirty, deleted, *chapterKeys',
+      strokes: 'id, pageKey, updated_at, dirty, deleted',
+      storybooks: 'id',
+      xrefs: 'key',
+      lexicon: 'code',
       meta: 'key'
     })
   }

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { importXrefs, importedXrefCount, coreXrefCount, clearImportedXrefs } from '../lib/xrefs'
+import { importLexicon, importedLexiconCount, coreLexiconCount, clearImportedLexicon } from '../lib/strongs'
 
 /**
  * Import the large public-domain study datasets that are too big to ship with
@@ -8,6 +9,11 @@ import { importXrefs, importedXrefCount, coreXrefCount, clearImportedXrefs } fro
  */
 export default function StudyDataImport() {
   const [imported, setImported] = useState<number | null>(null)
+  const [lexCount, setLexCount] = useState<number | null>(null)
+  const [lexBusy, setLexBusy] = useState(false)
+  const [lexStatus, setLexStatus] = useState('')
+  const [lexError, setLexError] = useState('')
+  const lexRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState(0)
   const [status, setStatus] = useState('')
@@ -15,7 +21,25 @@ export default function StudyDataImport() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   const refresh = () => importedXrefCount().then(setImported)
-  useEffect(() => { refresh() }, [])
+  const refreshLex = () => importedLexiconCount().then(setLexCount)
+  useEffect(() => { refresh(); refreshLex() }, [])
+
+  async function handleLexFile(f: File) {
+    setLexBusy(true); setLexError(''); setLexStatus('')
+    try {
+      const r = await importLexicon(await f.text())
+      setLexStatus(
+        `Imported ${r.entries.toLocaleString()} lexicon entries` +
+        (r.skipped ? `. ${r.skipped.toLocaleString()} skipped.` : '.')
+      )
+      await refreshLex()
+    } catch (e) {
+      setLexError(`Import failed: ${e instanceof Error ? e.message : e}`)
+    } finally {
+      setLexBusy(false)
+      if (lexRef.current) lexRef.current.value = ''
+    }
+  }
 
   async function handleFile(f: File) {
     setBusy(true); setError(''); setStatus(''); setProgress(0)
@@ -44,6 +68,7 @@ export default function StudyDataImport() {
   }
 
   return (
+    <>
     <div className="card">
       <h3>Cross references</h3>
       <p className="muted small">
@@ -75,6 +100,36 @@ export default function StudyDataImport() {
           onClick={async () => { await clearImportedXrefs(); refresh(); setStatus('') }}
         >Remove imported set</button>
       )}
+
     </div>
+
+    <div className="card">
+      <h3>Hebrew and Greek lexicon</h3>
+      <p className="muted small">
+        Tap a word while reading and the original word behind it appears, with its
+        meaning and every other verse that uses it. This needs a version that carries
+        Strong's numbers — <strong>KJV</strong> from bolls.life does.
+        {' '}<strong>{coreLexiconCount()}</strong> key words ship with the app
+        {lexCount !== null && lexCount > 0 && <>, and you have imported <strong>{lexCount.toLocaleString()}</strong> entries</>}.
+      </p>
+      <p className="muted small">
+        For the full dictionary, load a Strong's JSON file — either an object keyed by
+        number or an array of entries; common field names are recognised.
+      </p>
+      <input
+        ref={lexRef} type="file" accept=".json,application/json" disabled={lexBusy}
+        onChange={e => { const f = e.target.files?.[0]; if (f) handleLexFile(f) }}
+      />
+      {lexBusy && <p className="progress">Importing lexicon…</p>}
+      {lexStatus && <p className="small" style={{ marginBottom: 0 }}>{lexStatus}</p>}
+      {lexError && <p className="small" style={{ color: '#b3402a', marginBottom: 0 }}>{lexError}</p>}
+      {lexCount !== null && lexCount > 0 && !lexBusy && (
+        <button
+          className="btn secondary small" style={{ marginTop: 8 }}
+          onClick={async () => { await clearImportedLexicon(); refreshLex(); setLexStatus('') }}
+        >Remove imported lexicon</button>
+      )}
+    </div>
+    </>
   )
 }

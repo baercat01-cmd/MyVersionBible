@@ -85,3 +85,12 @@
 .xref:hover { border-left-color: var(--accent); }
 .xref-ref { display: block; color: var(--accent); font-weight: 600; }
 .xref-text { display: block; font-family: var(--serif); line-height: 1.45; }
+
+/* Strong's */
+.strongs { margin-bottom: 8px; }
+.strongs-head { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.strongs-code { color: var(--accent); font-weight: 700; font-size: 0.78rem; }
+.strongs-lemma { font-size: 1.15rem; font-family: var(--serif); }
+.strongs-translit { font-style: italic; color: var(--muted); font-size: 0.85rem; }
+.strongs-def { font-size: 0.85rem; line-height: 1.5; margin: 4px 0; }
+.strongs-uses { margin-top: 6px; border-top: 1px dashed var(--border); padding-top: 6px; }

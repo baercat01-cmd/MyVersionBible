@@ -12,6 +12,7 @@ import VerseText from '../components/VerseText'
 import DrawLayer from '../components/DrawLayer'
 import { onJump, takeJump } from '../lib/nav'
 import CrossRefs from '../components/CrossRefs'
+import StrongsInfo from '../components/StrongsInfo'
 
 interface Position { translation: string; book: number; chapter: number; parallel: string }
 
@@ -101,6 +102,13 @@ export default function ReaderView() {
       .sort((a, b) => (verseOf(a) - verseOf(b)) || a.created_at.localeCompare(b.created_at)),
     [anchored]
   )
+
+  // Strong's codes on the word currently selected, if the version carries them.
+  const selectedCodes = useMemo(() => {
+    if (!sel || sel.words.length !== 1 || !chapterRec) return []
+    const v = chapterRec.verses.find(x => x.v === sel.verse)
+    return v?.s?.[String(sel.words[0])] || []
+  }, [sel, chapterRec])
 
   function verseOf(n: NoteRec): number {
     const r = n.refs.find(x => x.book === pos.book && x.chapter === pos.chapter)
@@ -242,6 +250,9 @@ export default function ReaderView() {
             onNew={() => setEditing('new')}
             canAdd={!!sel}
           >
+            {selectedCodes.length > 0 && (
+              <StrongsInfo codes={selectedCodes} translation={pos.translation} />
+            )}
             {sel && (
               <CrossRefs
                 book={pos.book} chapter={pos.chapter} verse={sel.verse}

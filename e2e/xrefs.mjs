@@ -5,12 +5,13 @@ const ok = m => console.log('  ok - ' + m)
 const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' })
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+const cardFile = t => page.locator('.card').filter({ hasText: t }).locator('input[type=file]').first()
 page.on('pageerror', e => fail('page error: ' + e.message))
-await page.goto('http://localhost:4173/', { waitUntil: 'networkidle' })
+await page.goto('http://localhost:4174/', { waitUntil: 'networkidle' })
 
 const tab = name => page.locator('.tabbar button').filter({ hasText: name }).first()
 await tab('Versions').click()
-await page.locator('input[accept*="json"]').setInputFiles(
+await cardFile('Import a translation from a file').setInputFiles(
   new URL('./fixture-TESTV.json', import.meta.url).pathname)
 await page.waitForSelector('text=/TESTV/', { timeout: 15000 })
 
@@ -42,7 +43,7 @@ else ok('clicking a cross reference opens that passage')
 // Now import the full-format file.
 await tab('Versions').click()
 await page.waitForSelector('text=Cross references')
-await page.locator('input[accept*="txt"]').first().setInputFiles(
+await cardFile('Cross references').setInputFiles(
   new URL('./fixture-xrefs.txt', import.meta.url).pathname)
 await page.waitForSelector('text=/Imported .* cross references/', { timeout: 20000 })
 const msg = await page.locator('text=/Imported .* cross references/').innerText()
