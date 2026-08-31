@@ -1,0 +1,42 @@
+The Project Gutenberg eBook of Sample Story Book
+This header should be stripped and never appear in a chapter.
+*** START OF THIS PROJECT GUTENBERG EBOOK SAMPLE STORY BOOK ***
+
+STORY ONE.—How the World Was Made
+
+In the beginning, before there was any earth or sky, God made all
+things that are. This paragraph runs across several lines as it
+does in a real plain-text book.
+
+And a second paragraph follows, so we can check that paragraphs
+survive the import and are rendered separately.
+
+STORY TWO.—The First Garden
+
+In the beginning, before there was any earth or sky, God made all
+things that are. This paragraph runs across several lines as it
+does in a real plain-text book.
+
+And a second paragraph follows, so we can check that paragraphs
+survive the import and are rendered separately.
+
+STORY THREE.—The Story of the Flood
+
+In the beginning, before there was any earth or sky, God made all
+things that are. This paragraph runs across several lines as it
+does in a real plain-text book.
+
+And a second paragraph follows, so we can check that paragraphs
+survive the import and are rendered separately.
+
+STORY FOUR.—The Tower That Was Never Finished
+
+In the beginning, before there was any earth or sky, God made all
+things that are. This paragraph runs across several lines as it
+does in a real plain-text book.
+
+And a second paragraph follows, so we can check that paragraphs
+survive the import and are rendered separately.
+
+*** END OF THIS PROJECT GUTENBERG EBOOK SAMPLE STORY BOOK ***
+This footer should also be stripped.

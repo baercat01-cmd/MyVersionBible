@@ -8,10 +8,13 @@ import { parsePassages, loadPassages, passagesLabel, type LoadedChapter } from '
 import { bookName } from '../lib/books'
 import { MARK_COLORS, MARK_STYLES, colorHex } from '../lib/marks'
 import { buildPlan, getCompleted, toggleCompleted, getStartDate, startPlan, resetPlan, dayForDate } from '../lib/plan'
+import { paragraphs } from '../lib/storybooks'
 import VerseText, { type Selection } from '../components/VerseText'
 import NoteEditor from '../components/NoteEditor'
 
-type Order = 'chronological' | 'harmony'
+// 'book:<id>' selects an imported narrative retelling.
+type Order = 'chronological' | 'harmony' | string
+const BOOK_PREFIX = 'book:'
 const IDX_KEY = 'mvb-chrono-index'
 const ORDER_KEY = 'mvb-chrono-order'
 const STORY_KEY = 'mvb-story-view'
@@ -29,6 +32,10 @@ export default function ChronoView() {
   const [showPlan, setShowPlan] = useState(false)
 
   const translations = useLiveQuery(() => db.translations.toArray(), []) || []
+  const storyBooks = useLiveQuery(() => db.storybooks.toArray(), []) || []
+  const activeBook = order.startsWith(BOOK_PREFIX)
+    ? storyBooks.find(b => b.id === order.slice(BOOK_PREFIX.length))
+    : undefined
   const [translation, setTranslation] = useState('')
   useEffect(() => {
     if (translations.length && !translations.find(t => t.id === translation)) {
@@ -37,6 +44,9 @@ export default function ChronoView() {
   }, [translations.length])
 
   const segments = order === 'harmony' ? HARMONY : CHRONOLOGY
+  const bookChapter = activeBook
+    ? activeBook.chapters[Math.min(Math.max(index, 0), activeBook.chapters.length - 1)]
+    : undefined
   const clamped = Math.min(Math.max(index, 0), segments.length - 1)
   const segment: Segment | undefined = segments[clamped]
 
@@ -45,6 +55,14 @@ export default function ChronoView() {
   useEffect(() => { localStorage.setItem(STORY_KEY, story ? '1' : '0') }, [story])
   useEffect(() => { localStorage.setItem(COLOR_KEY, color) }, [color])
   useEffect(() => { setSel(null) }, [clamped, order, translation])
+
+  // Nothing to apply an order to: go straight to the retelling.
+  useEffect(() => {
+    if (!translations.length && storyBooks.length && !order.startsWith(BOOK_PREFIX)) {
+      setOrder(BOOK_PREFIX + storyBooks[0].id)
+      setIndex(0)
+    }
+  }, [translations.length, storyBooks.length, order])
 
   // Load the segment's passages from the chosen translation.
   useEffect(() => {
@@ -120,11 +138,16 @@ export default function ChronoView() {
     setSel(null)
   }
 
-  if (!translations.length) {
+  // A retelling needs no translation, so only block when there is nothing to read.
+  if (!translations.length && !storyBooks.length) {
     return (
       <div className="card">
-        <h3>Download a version first</h3>
-        <p>The chronological order applies to whichever translations you have on this device. Open the <strong>Versions</strong> tab and download one.</p>
+        <h3>Nothing to read yet</h3>
+        <p>
+          The chronological order applies to whichever translations you have on this
+          device. Open the <strong>Versions</strong> tab to download one — or import a
+          narrative retelling there to read on its own.
+        </p>
       </div>
     )
   }
@@ -184,27 +207,55 @@ export default function ChronoView() {
   return (
     <div>
       <div className="row no-print" style={{ marginBottom: 10 }}>
-        <select value={translation} onChange={e => setTranslation(e.target.value)}>
-          {translations.map(t => <option key={t.id} value={t.id}>{t.id}</option>)}
-        </select>
+        {translations.length > 0 && (
+          <select value={translation} onChange={e => setTranslation(e.target.value)}>
+            {translations.map(t => <option key={t.id} value={t.id}>{t.id}</option>)}
+          </select>
+        )}
         <select value={order} onChange={e => { setOrder(e.target.value as Order); setIndex(0) }}>
-          <option value="chronological">Whole Bible in order</option>
-          <option value="harmony">Life of Christ (gospel harmony)</option>
+          {translations.length > 0 && <option value="chronological">Whole Bible in order</option>}
+          {translations.length > 0 && <option value="harmony">Life of Christ (gospel harmony)</option>}
+          {storyBooks.map(b => (
+            <option key={b.id} value={BOOK_PREFIX + b.id}>{b.title} (retelling)</option>
+          ))}
         </select>
-        <select value={segment?.era || ''} onChange={e => {
+        {!activeBook && <select value={segment?.era || ''} onChange={e => {
           const i = segments.findIndex(s => s.era === e.target.value)
           if (i >= 0) { setIndex(i); window.scrollTo(0, 0) }
         }}>
           {ERAS.filter(era => segments.some(s => s.era === era.id))
             .map(era => <option key={era.id} value={era.id}>{era.title}</option>)}
-        </select>
-        <button className={`btn small ${story ? '' : 'secondary'}`} onClick={() => setStory(s => !s)}>
-          {story ? '📖 Story view' : '📑 Verse view'}
-        </button>
-        <button className="btn secondary small" onClick={() => setShowPlan(true)}>🗓 Plan</button>
+        </select>}
+        {!activeBook && (
+          <>
+            <button className={`btn small ${story ? '' : 'secondary'}`} onClick={() => setStory(s => !s)}>
+              {story ? '📖 Story view' : '📑 Verse view'}
+            </button>
+            <button className="btn secondary small" onClick={() => setShowPlan(true)}>🗓 Plan</button>
+          </>
+        )}
       </div>
 
-      {segment && (
+      {activeBook && bookChapter && (
+        <div className="reader chrono storyview">
+          <div className="segment-head">
+            <div className="era-label">{activeBook.title}{activeBook.author ? ` · ${activeBook.author}` : ''}</div>
+            <h2>{bookChapter.title}</h2>
+            <div className="muted small">
+              chapter {bookChapter.n} of {activeBook.chapters.length} · a retelling, not scripture
+            </div>
+          </div>
+          {paragraphs(bookChapter.text).map((para, i) => <p key={i} className="story-para">{para}</p>)}
+          <div className="chapternav no-print">
+            <button className="btn secondary" disabled={index <= 0}
+              onClick={() => { setIndex(index - 1); window.scrollTo(0, 0) }}>← Previous</button>
+            <button className="btn secondary" disabled={index >= activeBook.chapters.length - 1}
+              onClick={() => { setIndex(index + 1); window.scrollTo(0, 0) }}>Next →</button>
+          </div>
+        </div>
+      )}
+
+      {!activeBook && segment && (
         <div className={`reader chrono ${story ? 'storyview' : ''}`}>
           <div className="segment-head">
             {eraOf && <div className="era-label">{eraOf.title} · {eraOf.subtitle}</div>}

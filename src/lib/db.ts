@@ -78,6 +78,19 @@ export interface StrokeRec {
   dirty: 0 | 1
 }
 
+/**
+ * A narrative retelling of the Bible read alongside scripture — e.g. Hurlbut's
+ * "Story of the Bible" (1904, public domain). Imported from a plain-text or
+ * JSON file rather than downloaded, so any public-domain story book works.
+ */
+export interface StoryBookRec {
+  id: string
+  title: string
+  author: string
+  chapters: { n: number; title: string; text: string }[]
+  importedAt: string
+}
+
 export function pageKey(translation: string, book: number, chapter: number): string {
   return `${translation}:${book}:${chapter}`
 }
@@ -93,6 +106,7 @@ class MVBDatabase extends Dexie {
   chapters!: Table<ChapterRec, string>
   notes!: Table<NoteRec, string>
   strokes!: Table<StrokeRec, string>
+  storybooks!: Table<StoryBookRec, string>
   meta!: Table<MetaRec, string>
 
   constructor() {
@@ -125,6 +139,14 @@ class MVBDatabase extends Dexie {
       chapters: 'key, translation, [translation+book]',
       notes: 'id, kind, updated_at, dirty, deleted, *chapterKeys',
       strokes: 'id, pageKey, updated_at, dirty, deleted',
+      meta: 'key'
+    })
+    this.version(4).stores({
+      translations: 'id',
+      chapters: 'key, translation, [translation+book]',
+      notes: 'id, kind, updated_at, dirty, deleted, *chapterKeys',
+      strokes: 'id, pageKey, updated_at, dirty, deleted',
+      storybooks: 'id',
       meta: 'key'
     })
   }

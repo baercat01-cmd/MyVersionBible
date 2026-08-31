@@ -12,7 +12,7 @@ page.on('pageerror', e => fail('page error: ' + e.message))
 await page.goto('http://localhost:4173/', { waitUntil: 'networkidle' })
 
 await page.getByRole('button', { name: /Versions/ }).click()
-await page.locator('input[type=file]').setInputFiles(new URL('./fixture-TESTV.json', import.meta.url).pathname)
+await page.locator('input[accept*="json"]').setInputFiles(new URL('./fixture-TESTV.json', import.meta.url).pathname)
 await page.waitForSelector('text=/TESTV/', { timeout: 15000 })
 ok('fixture translation imported')
 
