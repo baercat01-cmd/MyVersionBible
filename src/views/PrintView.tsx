@@ -22,7 +22,7 @@ export default function PrintView() {
   const [verseTexts, setVerseTexts] = useState<Map<string, string>>(new Map())
 
   const notes = useLiveQuery(async () => {
-    const all = await db.notes.filter(n => !n.deleted).toArray()
+    const all = await db.notes.filter(n => !n.deleted && n.kind !== 'mark').toArray()
     return all.sort((a, b) => a.created_at.localeCompare(b.created_at))
   }, []) || []
 
