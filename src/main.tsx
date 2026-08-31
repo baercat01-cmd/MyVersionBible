@@ -1,11 +1,11 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { registerSW } from 'virtual:pwa-register'
+import { startUpdates } from './lib/pwa'
 import App from './App'
 import './styles.css'
 import './styles-chrono.css'
 
-registerSW({ immediate: true })
+startUpdates()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

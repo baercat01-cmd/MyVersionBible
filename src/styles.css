@@ -358,3 +358,12 @@ textarea { width: 100%; min-height: 90px; resize: vertical; line-height: 1.5; }
 }
 .sermon-hint { margin: 8px 0 4px; }
 .sermon-ref { color: var(--accent); font-weight: 600; }
+
+/* Which build this device is running, and taking a newer one */
+.buildstamp { color: var(--muted); font-size: 0.7rem; font-variant-numeric: tabular-nums; }
+.updatebar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 14px; background: var(--panel);
+  border-bottom: 1px solid var(--border); font-size: 0.9rem;
+  position: sticky; top: 0; z-index: 9;
+}

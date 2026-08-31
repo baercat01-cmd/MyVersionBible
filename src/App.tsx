@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { onJump } from './lib/nav'
+import { BUILD_ID, applyUpdate, onUpdateWaiting } from './lib/pwa'
 import ReaderView from './views/ReaderView'
 import ChronoView from './views/ChronoView'
 import SearchView from './views/SearchView'
@@ -35,13 +36,25 @@ export default function App() {
   useEffect(() => { localStorage.setItem(TAB_KEY, tab) }, [tab])
   // A jump requested from search or a cross reference opens the reader.
   useEffect(() => onJump(() => setTab('read')), [])
+  // A new build waiting behind the service worker, announced rather than forced.
+  const [updateReady, setUpdateReady] = useState(false)
+  useEffect(() => onUpdateWaiting(setUpdateReady), [])
 
   return (
     <>
       <div className="topbar no-print">
         <h1>MyVersionBible</h1>
         <div className="spacer" />
+        <span className="buildstamp" title={`Build ${BUILD_ID}`}>{BUILD_ID}</span>
       </div>
+
+      {updateReady && (
+        <div className="updatebar no-print">
+          <span>A newer version of the app is ready.</span>
+          <button className="btn small" onClick={applyUpdate}>Update now</button>
+          <button className="btn secondary small" onClick={() => setUpdateReady(false)}>Later</button>
+        </div>
+      )}
       <div className="main">
         {tab === 'read' && <ReaderView />}
         {tab === 'story' && <ChronoView />}
