@@ -14,6 +14,8 @@ interface Props {
   sel: Selection | null
   /** Story view drops the verse number and lets the text run as prose. */
   story?: boolean
+  /** Briefly highlighted after jumping here from search or a cross reference. */
+  flash?: boolean
   onWord: (book: number, chapter: number, verse: number, i: number) => void
   onVerse: (book: number, chapter: number, verse: number) => void
 }
@@ -23,7 +25,7 @@ interface Props {
  * reader and the chronological reader so marking behaves identically in both.
  */
 export default function VerseText({
-  book, chapter, verse, text, marks, sel, story, onWord, onVerse
+  book, chapter, verse, text, marks, sel, story, flash, onWord, onVerse
 }: Props) {
   const words = useMemo(() => tokenize(text), [text])
   const applied = useMemo(
@@ -34,7 +36,10 @@ export default function VerseText({
   const verseSelected = !!here && !sel!.words.length
 
   return (
-    <span className={`verse ${verseSelected ? 'selected' : ''}`}>
+    <span
+      className={`verse ${verseSelected ? 'selected' : ''} ${flash ? 'flash' : ''}`}
+      data-verse={`${book}-${chapter}-${verse}`}
+    >
       {!story && (
         <span className="vnum" onClick={() => onVerse(book, chapter, verse)} title="Select the whole verse">
           {verse}
